@@ -1,2 +1,2 @@
-# TOP-OPT_FORTRAN
-This contains a code developed in the FORTRAN programming language, to perform a topological optimization process. The code needs to be compiled and for that purpose a makefile is provided. For post-processing it is necessary to use the paraview software.
+# TOPOPT-FORTRAN
+This repository contains a code developed in FORTRAN, to perform a topological optimisation process. The code needs to be compiled and a makefile is provided for this purpose. For post-processing, the paraview software is used.
