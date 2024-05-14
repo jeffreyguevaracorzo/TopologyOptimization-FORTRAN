@@ -1,4 +1,4 @@
-# TOPOPT-FORTRAN
+# TopologyOptimization-FORTRAN
 
 This repository contains a series of FORTRAN routines to perform a topology optimization using FEM in linear elasticity. The code operates by inputting structure and load information into the "DataStructure" folder and defining characteristics in the main.f90 file. It utilizes the MA87 library from HSL (with an adapted interface), as well as the LAPACK, BLAS, Metis, and OpenMP libraries. The code uses either the method of moving asymptotes (MMA) or the optimality criterion (OC) presented by Professors Svanberg (1987) and Bendsoe & Sigmund (2013). This code is for academic purposes only.
 
