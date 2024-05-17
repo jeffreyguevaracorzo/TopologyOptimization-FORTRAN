@@ -1,4 +1,5 @@
-# n. of point loads
+#                 Node Loads                   #
 1
-# Nodes - Fx - Fy - Fz(3D only)
-1	0	0   0
+# |  node  |   FX   |   FY   |  Fz (only3D)  | # 5000 - 45000 - 
+1	0	0	0
+
