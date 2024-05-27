@@ -167,7 +167,7 @@ module Optimization_module
         class(Optimization), intent(inout)                           :: Self
         ! Printing code
         write(unit=*, fmt=*) 'Ite,', Iteration,'PenalFactor',Self%PenalFactor,'ObjFunction,',Sum(Self%Compilance),'Change', &
-                              Self%Change,'FracVolume,',Sum(Self%VolumePerElement*Self%DensityVector)/Sum(Self%VolumePerElement)
+                                Self%Change,'FracVolume,',Sum(Self%VolumePerElement*Self%DensityVector)/Sum(Self%VolumePerElement)
     end subroutine PrintingConvergence
     ! 8. Volume Calculation
     subroutine VolumeAllElement(Self)
@@ -177,10 +177,8 @@ module Optimization_module
         double precision                                             :: Area
         double precision, dimension(:), allocatable                  :: v1,v2,v3,v4,Centroid
         double precision, dimension(:,:), allocatable                :: Coordinates
-        ! process
         allocate(Self%VolumePerElement(Self%Ne))
         Self%VolumePerElement = 0.0d0
-        ! Process
         do i = 1, Self%Ne, 1
             Area = 0.0d0
             if ((Self%ElementType.eq.'tria3').or.(Self%ElementType.eq.'tria6')) then
@@ -270,7 +268,6 @@ module Optimization_module
         end do
         !call FilePrinting(Self%VolumePerElement,'V','DataResults/.InternalData/VolumePerElement.txt')
     end subroutine VolumeAllElement
-
     ! ----------------------------------------------------------------- !
     !      subroutines required for the topology optimization proc.     !
     ! ----------------------------------------------------------------- !
@@ -290,7 +287,7 @@ module Optimization_module
         allocate(DiffVolumeNew(Self%Ne));              DiffVolumeNew = 0.0d0
         allocate(RadPromE(self%Ne,Self%DimAnalysis));       RadPromE = 0.0d0
         allocate(PosPromE(self%Ne,Self%DimAnalysis));       PosPromE = 0.0d0
-        ! Get elemento position
+        ! Element position
         do i = 1, Self%Ne, 1
             PosPromE(i,:) = Sum(Self%Coordinates(Self%ConnectivityN(i,:),:),1)/Self%Npe
         end do
@@ -310,7 +307,6 @@ module Optimization_module
             DiffCompilanceNew(i) = DiffCompilanceNew(i)/(Self%DensityVector(i)*suma)
             DiffVolumeNew(i) = DiffVolumeNew(i)/(Self%DensityVector(i)*suma)
         end do
-        ! Diff compilance update
         Self%DiffCompilance = DiffCompilanceNew
         Self%DiffVolume = DiffVolumeNew/(Self%DensityVector*Self%VolumePerElement)
         deallocate(DiffCompilanceNew,DiffVolumeNew,Radius,RadPromE)
@@ -386,8 +382,6 @@ module Optimization_module
         implicit none
         class(Optimization), intent(inout)                           :: Self
         double precision, dimension(:), allocatable                  :: ObjFun
-        ! Note: the objective function or parameter for the sensitivity 
-        !       analysis can be changed by modifying the ObjFun variable.
         ObjFun = Self%StrainEnergyE
         Self%Compilance = (Self%DensityVector**Self%PenalFactor)*ObjFun
         Self%DiffCompilance = -Self%PenalFactor*(Self%DensityVector**(Self%PenalFactor-1.0d0))*ObjFun
