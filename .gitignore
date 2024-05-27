@@ -1,0 +1,8 @@
+*.mod
+*.o
+*.case
+*.geom
+*.esca
+*.txt
+ExecuteOptimization
+.DS_Store
