@@ -1,6 +1,12 @@
 module Paraview_Module
     implicit none
-    ! Generation interfaces
+    type PostprocessingInfo
+        character(len=15)                           :: PostprocessingPath
+        character(len=15)                           :: Selection
+    contains 
+        procedure                                   :: PlottingSelection
+    end type PostprocessingInfo
+    ! interfaces
     interface DensityParaviewPostProcessing
         module procedure DensityParaviewPostProcessingReal
         module procedure DensityParaviewPostProcessingDP
@@ -21,9 +27,43 @@ module Paraview_Module
         module procedure StrainEnergyParaviewPostProcessingReal
         module procedure StrainEnergyParaviewPostProcessingDP
     end interface StrainEnergyParaviewPostProcessing
-
     contains
-
+    ! ** base procedures
+    ! Input postprocessing type
+    subroutine PlottingSelection(self,info)
+        implicit none
+        character(len=*), intent(in)                :: info
+        class(PostprocessingInfo), intent(inout)    :: self 
+        self%Selection = info
+    end subroutine PlottingSelection
+    ! Generate postprocessing files
+    subroutine GetParaviewFiles(Self1,Self2)
+        use Optimization_module
+        implicit none
+        class(Optimization), intent(inout)          :: Self1
+        class(PostprocessingInfo), intent(inout)    :: Self2
+        Self1%ConnectivityN = Self1%ConnectivityN(Self1%FinalGeometry,:)
+        if(Self2%Selection.eq.'DensityDist') then
+            Self1%FinalDensityVector = Self1%DensityVector(Self1%FinalGeometry)
+            call DensityParaviewPostProcessing('Paraview','Density',Self1%Coordinates,Self1%ConnectivityN,Self1%ElementType,&
+                Self1%FinalDensityVector)
+        elseif(Self2%Selection.eq.'Displacement') then
+            call DisplacementParaviewPostProcessing('Paraview','Displacement',Self1%Coordinates,Self1%ConnectivityN, &
+                Self1%ElementType,Self1%Displacement)
+        elseif(Self2%Selection.eq.'Strain') then
+            Self1%StrainE = Self1%StrainE(Self1%FinalGeometry,:)
+            call StrainParaviewPostProcessing('Paraview','Strain',Self1%Coordinates,Self1%ConnectivityN,Self1%ElementType, &
+                Self1%StrainE)
+        elseif(Self2%Selection.eq.'Stress') then
+            Self1%StressE = Self1%StressE(Self1%FinalGeometry,:)
+            call StressParaviewPostProcessing('Paraview','Stress',Self1%Coordinates,Self1%ConnectivityN,Self1%ElementType, &
+                Self1%StressE)
+        elseif(Self2%Selection.eq.'StrainEnergy') then
+            Self1%StrainEnergyE = Self1%StrainEnergyE(Self1%FinalGeometry)
+            call StrainEnergyParaviewPostProcessing('Paraview','StrainEnergy',Self1%Coordinates,Self1%ConnectivityN, &
+                Self1%ElementType,Self1%StrainEnergyE)
+        end if
+    end subroutine GetParaviewFiles
     ! --------------- ADDITIONAL BASE FUNCTIONS AND SUBROUTINES ---------------
     Subroutine GenerateGeometryParaviewFileReal(Path,Element,DimAnalysis,Connect,Coord)
         implicit none
@@ -189,7 +229,6 @@ module Paraview_Module
             end do
         close(iounit)
     end subroutine GenerateEscalarParaviewFileDP
-
     ! ------------ FINITE ELEMENT ANALYSISS FUNCTIONS AND SUBROUTINES ------------
     subroutine DensityParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,Density)
         implicit none
@@ -481,14 +520,13 @@ module Paraview_Module
             stop "ERROR Paraview - Geometry -"
         end if
     end subroutine DisplacementParaviewPostProcessingDP
-    subroutine StrainParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,StrainNode,StrainElement)
+    subroutine StrainParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,StrainElement)
         implicit none
         character(len=*), intent(in)                               :: Path              ! Folder name
         character(len=*), intent(in)                               :: ResultName        ! Result name
         character(len=*), intent(in)                               :: Element           ! Element type
         integer, dimension(:,:), allocatable, intent(in)           :: Connect           ! conectivity
-        real, dimension(:,:), allocatable, intent(in)              :: StrainNode        ! Result variable
-        real, dimension(:,:), allocatable, intent(in)              :: StrainElement        ! Result variable
+        real, dimension(:,:), allocatable, intent(in)              :: StrainElement     ! Result variable
         real, dimension(:,:), allocatable, intent(in)              :: Coord             ! Coordinates
         ! internal variables
         real, dimension(:), allocatable                            :: Result
@@ -515,15 +553,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -543,19 +572,6 @@ module Paraview_Module
             Result = sqrt(StrainElement(:,1)**2+StrainElement(:,2)**2-StrainElement(:,1)*StrainElement(:,2) &
                     +3*StrainElement(:,3)**2)
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StrainNode(:,1)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StrainNode(:,2)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StrainNode(:,3)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt(StrainNode(:,1)**2+StrainNode(:,2)**2-StrainNode(:,1)*StrainNode(:,2)+3*StrainNode(:,3)**2)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
             CaseName = ResultName //'.case'
@@ -583,21 +599,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -624,43 +625,20 @@ module Paraview_Module
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
             Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
             Result = sqrt((StrainElement(:,1)-StrainElement(:,2))**2+(StrainElement(:,2)-StrainElement(:,3))**2 &
-                  +(StrainElement(:,3)-StrainElement(:,1))**2+3*(StrainElement(:,4)**2+StrainElement(:,5)**2+StrainElement(:,6)*2))
+                        +(StrainElement(:,3)-StrainElement(:,1))**2+3*(StrainElement(:,4)**2+StrainElement(:,5)**2 &
+                        +StrainElement(:,6)*2))
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StrainNode(:,1)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StrainNode(:,2)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-            Result = StrainNode(:,3)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StrainNode(:,4)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-            Result = StrainNode(:,5)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-            Result = StrainNode(:,6)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt((StrainNode(:,1)-StrainNode(:,2))**2+(StrainNode(:,2)-StrainNode(:,3))**2 &
-                    +(StrainNode(:,3)-StrainNode(:,1))**2+3*(StrainNode(:,4)**2+StrainNode(:,5)**2+StrainNode(:,6)*2))
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
         else
             stop "ERROR Paraview - Strain -"
         end if
     end subroutine StrainParaviewPostProcessingReal
-    subroutine StrainParaviewPostProcessingDP(Path,ResultName,Coord,Connect,Element,StrainNode,StrainElement)
+    subroutine StrainParaviewPostProcessingDP(Path,ResultName,Coord,Connect,Element,StrainElement)
         implicit none
         character(len=*), intent(in)                               :: Path              ! Folder name
         character(len=*), intent(in)                               :: ResultName        ! Result name
         character(len=*), intent(in)                               :: Element           ! Element type
         integer, dimension(:,:), allocatable, intent(in)           :: Connect           ! conectivity
-        double precision, dimension(:,:), allocatable, intent(in)  :: StrainNode        ! Result variable
-        double precision, dimension(:,:), allocatable, intent(in)  :: StrainElement        ! Result variable
+        double precision, dimension(:,:), allocatable, intent(in)  :: StrainElement     ! Result variable
         double precision, dimension(:,:), allocatable, intent(in)  :: Coord             ! Coordinates
         ! internal variables
         double precision, dimension(:), allocatable                :: Result
@@ -687,15 +665,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -715,19 +684,6 @@ module Paraview_Module
             Result = sqrt(StrainElement(:,1)**2+StrainElement(:,2)**2-StrainElement(:,1)*StrainElement(:,2)&
                     +3*StrainElement(:,3)**2)
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StrainNode(:,1)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StrainNode(:,2)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StrainNode(:,3)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt(StrainNode(:,1)**2+StrainNode(:,2)**2-StrainNode(:,1)*StrainNode(:,2)+3*StrainNode(:,3)**2)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
             CaseName = ResultName //'.case'
@@ -755,21 +711,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -796,42 +737,19 @@ module Paraview_Module
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
             Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
             Result = sqrt((StrainElement(:,1)-StrainElement(:,2))**2+(StrainElement(:,2)-StrainElement(:,3))**2 &
-                  +(StrainElement(:,3)-StrainElement(:,1))**2+3*(StrainElement(:,4)**2+StrainElement(:,5)**2+StrainElement(:,6)*2))
+                    +(StrainElement(:,3)-StrainElement(:,1))**2+3*(StrainElement(:,4)**2+StrainElement(:,5)**2+ &
+                    StrainElement(:,6)*2))
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StrainNode(:,1)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StrainNode(:,2)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-            Result = StrainNode(:,3)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StrainNode(:,4)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-            Result = StrainNode(:,5)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-            Result = StrainNode(:,6)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt((StrainNode(:,1)-StrainNode(:,2))**2+(StrainNode(:,2)-StrainNode(:,3))**2 &
-                     +(StrainNode(:,3)-StrainNode(:,1))**2+3*(StrainNode(:,4)**2+StrainNode(:,5)**2+StrainNode(:,6)*2))
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
         else
             stop "ERROR Paraview - Strain -"
         end if
     end subroutine StrainParaviewPostProcessingDP
-    subroutine StressParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,StressNode,StressElement)
+    subroutine StressParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,StressElement)
         implicit none
         character(len=*), intent(in)                               :: Path              ! Folder name
         character(len=*), intent(in)                               :: ResultName        ! Result name
         character(len=*), intent(in)                               :: Element           ! Element type
         integer, dimension(:,:), allocatable, intent(in)           :: Connect           ! conectivity
-        real, dimension(:,:), allocatable, intent(in)              :: StressNode        ! Result variable
         real, dimension(:,:), allocatable, intent(in)              :: StressElement     ! Result variable
         real, dimension(:,:), allocatable, intent(in)              :: Coord             ! Coordinates
         ! internal variables
@@ -859,15 +777,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -887,19 +796,6 @@ module Paraview_Module
             Result = sqrt(StressElement(:,1)**2+StressElement(:,2)**2-StressElement(:,1)*StressElement(:,2) &
                     +3*StressElement(:,3)**2)
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StressNode(:,1)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StressNode(:,2)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StressNode(:,3)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt(StressNode(:,1)**2+StressNode(:,2)**2-StressNode(:,1)*StressNode(:,2)+3*StressNode(:,3)**2)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
             CaseName = ResultName //'.case'
@@ -927,21 +823,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -970,40 +851,16 @@ module Paraview_Module
             Result = sqrt((StressElement(:,1)-StressElement(:,2))**2+(StressElement(:,2)-StressElement(:,3))**2 &
                 +(StressElement(:,3)-StressElement(:,1))**2+3*(StressElement(:,4)**2+StressElement(:,5)**2+StressElement(:,6)*2))
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StressNode(:,1)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StressNode(:,2)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-            Result = StressNode(:,3)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StressNode(:,4)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-            Result = StressNode(:,5)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-            Result = StressNode(:,6)
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt((StressNode(:,1)-StressNode(:,2))**2+(StressNode(:,2)-StressNode(:,3))**2 &
-                    +(StressNode(:,3)-StressNode(:,1))**2+3*(StressNode(:,4)**2+StressNode(:,5)**2+StressNode(:,6)*2))
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
         else
             stop "ERROR Paraview - Stress -"
         end if
     end subroutine StressParaviewPostProcessingReal
-    subroutine StressParaviewPostProcessingDP(Path,ResultName,Coord,Connect,Element,StressNode,StressElement)
+    subroutine StressParaviewPostProcessingDP(Path,ResultName,Coord,Connect,Element,StressElement)
         implicit none
         character(len=*), intent(in)                               :: Path              ! Folder name
         character(len=*), intent(in)                               :: ResultName        ! Result name
         character(len=*), intent(in)                               :: Element           ! Element type
         integer, dimension(:,:), allocatable, intent(in)           :: Connect           ! conectivity
-        double precision, dimension(:,:), allocatable, intent(in)  :: StressNode        ! Result variable
         double precision, dimension(:,:), allocatable, intent(in)  :: StressElement     ! Result variable
         double precision, dimension(:,:), allocatable, intent(in)  :: Coord             ! Coordinates
         ! internal variables
@@ -1031,15 +888,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -1059,19 +907,6 @@ module Paraview_Module
             Result = sqrt(StressElement(:,1)**2+StressElement(:,2)**2-StressElement(:,1)*StressElement(:,2) &
                     +3*StressElement(:,3)**2)
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StressNode(:,1)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StressNode(:,2)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StressNode(:,3)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt(StressNode(:,1)**2+StressNode(:,2)**2-StressNode(:,1)*StressNode(:,2)+3*StressNode(:,3)**2)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
             CaseName = ResultName //'.case'
@@ -1099,21 +934,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
-                ! per node
-                Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
             Path1 = Path // '/' // ResultName //'.geom'
@@ -1142,41 +962,17 @@ module Paraview_Module
             Result = sqrt((StressElement(:,1)-StressElement(:,2))**2+(StressElement(:,2)-StressElement(:,3))**2 &
                 +(StressElement(:,3)-StressElement(:,1))**2+3*(StressElement(:,4)**2+StressElement(:,5)**2+StressElement(:,6)*2))
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
-            ! - per node
-            Path1 = Path // '/' // ResultName // 'N_xx' //  '.esca'
-            Result = StressNode(:,1)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yy' //  '.esca'
-            Result = StressNode(:,2)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_zz' //  '.esca'
-            Result = StressNode(:,3)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xy' //  '.esca'
-            Result = StressNode(:,4)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_yz' //  '.esca'
-            Result = StressNode(:,5)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_xz' //  '.esca'
-            Result = StressNode(:,6)
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
-            Path1 = Path // '/' // ResultName // 'N_VonMises' //  '.esca'
-            Result = sqrt((StressNode(:,1)-StressNode(:,2))**2+(StressNode(:,2)-StressNode(:,3))**2 &
-                        +(StressNode(:,3)-StressNode(:,1))**2+3*(StressNode(:,4)**2+StressNode(:,5)**2+StressNode(:,6)*2))
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
         else
             stop "ERROR Paraview - Stress -"
         end if
     end subroutine StressParaviewPostProcessingDP
-    subroutine StrainEnergyParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,StrainEnergyN,StrainEnergyE)
+    subroutine StrainEnergyParaviewPostProcessingReal(Path,ResultName,Coord,Connect,Element,StrainEnergyE)
         implicit none
         character(len=*), intent(in)                               :: Path              ! Folder name
         character(len=*), intent(in)                               :: ResultName        ! Result name
         character(len=*), intent(in)                               :: Element           ! Element type
         integer, dimension(:,:), allocatable, intent(in)           :: Connect           ! conectivity
-        real, dimension(:), allocatable, intent(in)                :: StrainEnergyN     
-        real, dimension(:), allocatable, intent(in)                :: StrainEnergyE     
+        real, dimension(:), allocatable, intent(in)                :: StrainEnergyE
         real, dimension(:,:), allocatable, intent(in)              :: Coord             ! Coordinates
         ! internal variables
         character(len=100)                                         :: Path1,CaseName
@@ -1193,8 +989,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
@@ -1202,8 +996,6 @@ module Paraview_Module
             Path1 = Path // '/' // ResultName //'.geom'
             call GenerateGeometryParaviewFileReal(Path1,Element,2,Connect,Coord)
             ! Escalar files
-            Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',StrainEnergyN)
             Path1 = Path // '/' // ResultName // 'E' //  '.esca'
             call GenerateEscalarParaviewFileReal(Path1,Element,StrainEnergyE)
         elseif (size(Coord,2).eq.3) then
@@ -1218,8 +1010,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
@@ -1227,22 +1017,19 @@ module Paraview_Module
             Path1 = Path // '/' // ResultName //'.geom'
             call GenerateGeometryParaviewFileReal(Path1,Element,3,Connect,Coord)
             ! Escalar files
-            Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-            call GenerateEscalarParaviewFileReal(Path1,'coordinates',StrainEnergyN)
             Path1 = Path // '/' // ResultName // 'E' //  '.esca'
             call GenerateEscalarParaviewFileReal(Path1,Element,StrainEnergyE)
         else
             stop "ERROR Paraview - Geometry -"
         end if
     end subroutine StrainEnergyParaviewPostProcessingReal
-    subroutine StrainEnergyParaviewPostProcessingDP(Path,ResultName,Coord,Connect,Element,StrainEnergyN,StrainEnergyE)
+    subroutine StrainEnergyParaviewPostProcessingDP(Path,ResultName,Coord,Connect,Element,StrainEnergyE)
         implicit none
         character(len=*), intent(in)                               :: Path              ! Folder name
         character(len=*), intent(in)                               :: ResultName        ! Result name
         character(len=*), intent(in)                               :: Element           ! Element type
         integer, dimension(:,:), allocatable, intent(in)           :: Connect           ! conectivity
-        double precision, dimension(:), allocatable, intent(in)    :: StrainEnergyN     
-        double precision, dimension(:), allocatable, intent(in)    :: StrainEnergyE     
+        double precision, dimension(:), allocatable, intent(in)    :: StrainEnergyE
         double precision, dimension(:,:), allocatable, intent(in)  :: Coord             ! Coordinates
         ! internal variables
         character(len=100)                                         :: Path1,CaseName
@@ -1259,8 +1046,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
@@ -1268,8 +1053,6 @@ module Paraview_Module
             Path1 = Path // '/' // ResultName //'.geom'
             call GenerateGeometryParaviewFileDP(Path1,Element,2,Connect,Coord)
             ! Escalar files
-            Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',StrainEnergyN)
             Path1 = Path // '/' // ResultName // 'E' //  '.esca'
             call GenerateEscalarParaviewFileDP(Path1,Element,StrainEnergyE)
         elseif (size(Coord,2).eq.3) then
@@ -1284,8 +1067,6 @@ module Paraview_Module
                 write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-                write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // 'N' // ' ' // Path1
                 Path1 = Path // '/' // ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
@@ -1293,8 +1074,6 @@ module Paraview_Module
             Path1 = Path // '/' // ResultName //'.geom'
             call GenerateGeometryParaviewFileDP(Path1,Element,3,Connect,Coord)
             ! Escalar files
-            Path1 = Path // '/' // ResultName // 'N' //  '.esca'
-            call GenerateEscalarParaviewFileDP(Path1,'coordinates',StrainEnergyN)
             Path1 = Path // '/' // ResultName // 'E' //  '.esca'
             call GenerateEscalarParaviewFileDP(Path1,Element,StrainEnergyE)
         else

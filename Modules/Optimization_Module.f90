@@ -160,7 +160,16 @@ module Optimization_module
         ! Assign the MMA Params.
         call MMAParameters(Self)
     end subroutine UploadOptimizationParameters
-    ! 7. Volume Calculation
+    ! 7. Printing TO Convergence
+    Subroutine PrintingConvergence(Iteration,Self)
+        implicit none
+        integer, intent(in)                                          :: Iteration
+        class(Optimization), intent(inout)                           :: Self
+        ! Printing code
+        write(unit=*, fmt=*) 'Ite,', Iteration,'PenalFactor',Self%PenalFactor,'ObjFunction,',Sum(Self%Compilance),'Change', &
+                              Self%Change,'FracVolume,',Sum(Self%VolumePerElement*Self%DensityVector)/Sum(Self%VolumePerElement)
+    end subroutine PrintingConvergence
+    ! 8. Volume Calculation
     subroutine VolumeAllElement(Self)
         implicit none
         class(Optimization), intent(inout)                              :: Self
@@ -259,7 +268,7 @@ module Optimization_module
                 Self%VolumePerElement(i) = Self%VolumePerElement(i) + abs(dot_product(CrossProduct(v1,v2),v3))/6.0d0
             end if
         end do
-        call FilePrinting(Self%VolumePerElement,'V','DataResults/.InternalData/VolumePerElement.txt')
+        !call FilePrinting(Self%VolumePerElement,'V','DataResults/.InternalData/VolumePerElement.txt')
     end subroutine VolumeAllElement
 
     ! ----------------------------------------------------------------- !
@@ -360,14 +369,12 @@ module Optimization_module
         v1 = sum(Self%DensityVector*Self%VolumePerElement)
         v2 = sum(Self%VolumePerElement*Self%VolFraction)
         Self%fval(1,1) = (v1 - v2)
-        !write(unit=*, fmt=*) 'Fval', (v1 - v2)/sum(Self%VolumePerElement)
         Self%f0val = sum(Self%Compilance)
-
         Self%dfdx(1,:) = Self%DiffVolume
         Self%df0dx(:,1) = Self%DiffCompilance
         ! applying the MMA solver interface of Svanberg
         call MMA_Solver_Interface(self%mm,Self%nn,Self%Iteration,Self%XMMA,Self%xmin,Self%xmax,Self%xold1,Self%xold2, &
-                                  Self%f0val,Self%df0dx,Self%fval,Self%dfdx,Self%low,Self%upp,Self%a0,Self%a,Self%c,Self%d)
+                                Self%f0val,Self%df0dx,Self%fval,Self%dfdx,Self%low,Self%upp,Self%a0,Self%a,Self%c,Self%d)
         ! Replace solutions
         Self%xold2 = Self%xold1
         Self%xold1(:,1) = Self%DensityVector
@@ -412,12 +419,10 @@ module Optimization_module
             call DensityFilter(Self)
             write(unit=*, fmt=*) '-Getting new solution'
             ! choose the Opt. Algorhtm
-            !call OptimalityCriteria(Self)
-            call MethodMovingAsympotes(Self)
-            write(unit=*, fmt=*) '--- IteNo.', Self%Iteration, &
-                                 'ObjFun.', Sum(Self%Compilance), &
-                                 'FracVol.', Sum(Self%VolumePerElement*Self%DensityVector)/Sum(Self%VolumePerElement), &
-                                 'Change', Self%Change
+            call OptimalityCriteria(Self)
+            !call MethodMovingAsympotes(Self)
+            ! Printing Convergence
+            call PrintingConvergence(Self%Iteration,Self)
         end do
         call FinalToplogy(Self)
     end subroutine TopologyOptimizationProcess

@@ -11,14 +11,20 @@ FILES = Modules/MA87Routines/sdeps90.f90 \
 		Modules/MMARoutines/MMA_Routines.f90 \
 		Modules/MMARoutines/MMA_Interface.f90 \
 		Modules/Base_Module.f90 \
-		Modules/Solver_Module.f90 \
-		Modules/Paraview_Module.f90 \
+		Modules/Solver_MA87Module.f90 \
 		Modules/FEA_Module.f90 \
 		Modules/Optimization_Module.f90 \
+		Modules/Paraview_Module.f90 \
 		MainOptimization.f90
-
-# object files
+DIR = Paraview DataResults DataResults/.InternalData
+# Object files
 OBJ1 = ${FILES:.f90=.o}
+
+all: create_dirs $(TARGET)
+
+# dir
+create_dirs:
+	mkdir -p $(DIR)
 
 # compilation and cleanup command
 %.o : %.f90
@@ -29,4 +35,5 @@ ${TARGET} : ${OBJ1}
 
 .PHONY : clean
 clean :
-	@rm -f *.o *.mod ${TARGET} ${OBJ1} DataResults/*.txt DataResults/.InternalData/*.txt Paraview/*.geom Paraview/*.esca *.case
+	@rm -f *.o *.mod ${TARGET} ${OBJ1} DataResults/*.txt DataResults/.InternalData/*.txt \
+	Paraview/*.geom Paraview/*.esca *.case

@@ -1,96 +1,14 @@
-module Solver_Module
+module Solver_MA87Module
     implicit none
     ! Lapack, BLAS, OpemMP and Metis are needed in some routines/functions
-    interface DenseSystemSolver
-        module procedure RealDenseSystemSolver_BVector
-        module procedure RealDenseSystemSolver_BMatrix
-        module procedure DPDenseSystemSolver_BVector
-        module procedure DPDenseSystemSolver_BMatrix
-    end interface DenseSystemSolver
     interface SparseSystemSolver
         module procedure RealSparseSystemSolver_BVector
         module procedure RealSparseSystemSolver_BMatrix
         module procedure DPSparseSystemSolver_BMatrix
         module procedure DPSparseSystemSolver_BVector
     end interface SparseSystemSolver
-
     contains
     ! ----------------- ALL FUNCTIONS AND SUBROUTINES -----------------
-    ! 1. Dense System Solver (Lapack based)
-    ! 1.1. Real system (B Vector)
-    function RealDenseSystemSolver_BVector(A,B) result(X)
-        implicit none
-        integer                                             :: n
-        integer                                             :: info
-        integer, dimension(:), allocatable                  :: ipiv
-        real, dimension(:), allocatable                     :: X
-        real, dimension(:), allocatable, intent(in)         :: B
-        real, dimension(:,:), allocatable, intent(in)       :: A
-        n = size(B)
-        allocate(ipiv(n))
-        call SGESV(n,1,A,n,ipiv,B,n,info)
-        if(info.ne.0) then
-            write(unit=*, fmt=*) "ERROR in DGESV solver, failed with info", info 
-            stop "Check the system"
-        end if
-        X = B
-    end function RealDenseSystemSolver_BVector
-    ! 1.2. Real system (B Matrix)
-    function RealDenseSystemSolver_BMatrix(A,B) result(X)
-        implicit none
-        integer                                             :: n,m
-        integer                                             :: info
-        integer, dimension(:), allocatable                  :: ipiv
-        real, dimension(:,:), allocatable                   :: X
-        real, dimension(:,:), allocatable, intent(in)       :: B
-        real, dimension(:,:), allocatable, intent(in)       :: A
-        n = size(B,1)
-        m = size(B,2)
-        allocate(ipiv(n))
-        call SGESV(n,m,A,n,ipiv,B,n,info)
-        if(info.ne.0) then
-            write(unit=*, fmt=*) "ERROR in DGESV solver, failed with info", info 
-            stop "Check the system"
-        end if
-        X = B
-    end function RealDenseSystemSolver_BMatrix
-    ! 1.3. Double precision system
-    function DPDenseSystemSolver_BVector(A,B) result(X)
-        implicit none
-        integer                                                     :: n
-        integer                                                     :: info
-        integer, dimension(:), allocatable                          :: ipiv
-        double precision, dimension(:), allocatable                 :: X
-        double precision, dimension(:), allocatable, intent(in)     :: B
-        double precision, dimension(:,:), allocatable, intent(in)   :: A
-        n = size(B)
-        allocate(ipiv(n))
-        call DGESV(n,1,A,n,ipiv,B,n,info)
-        if(info.ne.0) then
-            write(unit=*, fmt=*) "ERROR in DGESV solver, failed with info", info 
-            stop "Check the system"
-        end if
-        X = B
-    end function DPDenseSystemSolver_BVector
-    ! 1.3. Double precision system
-    function DPDenseSystemSolver_BMatrix(A,B) result(X)
-        implicit none
-        integer                                                     :: n,m
-        integer                                                     :: info
-        integer, dimension(:), allocatable                          :: ipiv
-        double precision, dimension(:,:), allocatable               :: X
-        double precision, dimension(:,:), allocatable, intent(in)   :: B
-        double precision, dimension(:,:), allocatable, intent(in)   :: A
-        n = size(B,1)
-        m = size(B,2)
-        allocate(ipiv(n))
-        call DGESV(n,m,A,n,ipiv,B,n,info)
-        if(info.ne.0) then
-            write(unit=*, fmt=*) "ERROR in DGESV solver, failed with info", info 
-            stop "Check the system"
-        end if
-        X = B
-    end function DPDenseSystemSolver_BMatrix
     ! 2. Sparse System Solver
     ! 2.1. Real system (B Vector)
     function RealSparseSystemSolver_BVector(RowVectorA,ColVectorA,ValueVectorA,ValueVectorB) result(X)
@@ -264,4 +182,4 @@ module Solver_Module
         write(*,*) "Failure during ", context, " with flag = ", flag
         stop
     end subroutine stop_on_bad_flag
-end module Solver_Module
+end module Solver_MA87Module

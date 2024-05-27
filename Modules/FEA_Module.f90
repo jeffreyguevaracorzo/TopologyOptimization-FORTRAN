@@ -1,10 +1,10 @@
 module FEA_Module
     use Base_Module
-    use Solver_Module
+    use Solver_MA87Module
     implicit none
     ! Type variable for all the information of the structure
     type Structure
-        character(len=20)                               :: AnalysisType     ! PlaneStress(2D), PlainStrain(2D), HookeLaw(3D)
+        character(len=20)                               :: AnalysisType     ! PlaneStress(2D), PlainStrain(2D), SolidIso(3D)
         character(len=20)                               :: ElementType      ! tri3 tri6, cuad4, cuad8, tetra4, tetra10, hexa8, hexa20
         integer                                         :: DimAnalysis      ! 2D or 3D
         integer                                         :: QuadGauss        ! Number of GaussPoints
@@ -40,12 +40,9 @@ module FEA_Module
         double precision, dimension(:), allocatable     :: UGlobal          ! Global displacement vector
         ! Results
         double precision, dimension(:), allocatable     :: StrainEnergyE    ! Strain energy per element
-        double precision, dimension(:), allocatable     :: StrainEnergyN    ! Strain energy per node
         double precision, dimension(:,:), allocatable   :: Displacement     ! Global dispacement matrix
         double precision, dimension(:,:), allocatable   :: StrainE          ! Strain per element
-        double precision, dimension(:,:), allocatable   :: StrainN          ! Strain per node
         double precision, dimension(:,:), allocatable   :: StressE          ! Stress per element
-        double precision, dimension(:,:), allocatable   :: StressN          ! Stress per node
     contains
         procedure                                       :: SetAnalysisType
         procedure                                       :: SetElementType
@@ -162,7 +159,7 @@ module FEA_Module
         Self%AnalysisType = AnalysisType
         if (Self%AnalysisType.eq.'PlaneStress'.or.Self%AnalysisType.eq.'PlaneStrain') then
             Self%DimAnalysis = 2
-        elseif (Self%AnalysisType.eq.'HookeLaw') then 
+        elseif (Self%AnalysisType.eq.'SolidIso') then 
             Self%DimAnalysis = 3
         else
             stop "ERROR, Setting Analysis type"
@@ -209,25 +206,45 @@ module FEA_Module
         implicit none
         class(Structure), intent(inout)                             :: Self 
         integer, intent(in)                                         :: Gauss
-        if (Gauss.eq.0.or.Gauss.gt.5) stop "ERROR, GuassQuadrature greater than 5 or equal to zero" 
+        double precision                                            :: LB, UB, Coef1, Coef2
+        if (Gauss.le.0.or.Gauss.gt.5) stop "ERROR, GuassQuadrature (greater than 5 or <= to zero)" 
         Self%QuadGauss = Gauss
         select case (Gauss)
             case (1)
-                allocate(Self%GaussPoint(1));       Self%GaussPoint = [0.00000000]
-                allocate(Self%GaussWeights(1));   Self%GaussWeights = [2.00000000]
+                allocate(Self%GaussPoint(1))
+                allocate(Self%GaussWeights(1))
+                Self%GaussPoint = [0.00000000d0]
+                Self%GaussWeights = [2.00000000d0]
             case (2)
-                allocate(Self%GaussPoint(2));       Self%GaussPoint = [-0.57735026,0.57735026]
-                allocate(Self%GaussWeights(2));   Self%GaussWeights = [1.00000000,1.00000000]
+                allocate(Self%GaussPoint(2))
+                allocate(Self%GaussWeights(2))
+                Self%GaussPoint = [-0.57735026d0,0.57735026d0]
+                Self%GaussWeights = [1.00000000d0,1.00000000d0]
             case (3)
-                allocate(Self%GaussPoint(3));       Self%GaussPoint = [-0.77459666,0.00000000,0.77459666]
-                allocate(Self%GaussWeights(3));   Self%GaussWeights = [0.55555555,0.88888888,0.55555555]
+                allocate(Self%GaussPoint(3))
+                allocate(Self%GaussWeights(3))
+                Self%GaussPoint = [-0.77459666d0,0.00000000d0,0.77459666d0]
+                Self%GaussWeights = [0.55555555d0,0.88888888d0,0.55555555d0]
             case (4)
-                allocate(Self%GaussPoint(4));       Self%GaussPoint = [-0.86113631,-0.33998104,0.33998104,0.86113631]
-                allocate(Self%GaussWeights(4));   Self%GaussWeights = [0.34785484,0.65214515,0.65214515,0.34785484]
+                allocate(Self%GaussPoint(4))
+                allocate(Self%GaussWeights(4))
+                Self%GaussPoint = [-0.86113631d0,-0.33998104d0,0.33998104d0,0.86113631d0]
+                Self%GaussWeights = [0.34785484d0,0.65214515d0,0.65214515d0,0.34785484d0]
             case (5)
-                allocate(Self%GaussPoint(5));       Self%GaussPoint = [-0.90617984,-0.53846931,0.00000000,0.53846931,0.90617984]
-                allocate(Self%GaussWeights(5));   Self%GaussWeights = [0.23692688,0.47862867,0.56888888,0.47862867,0.23692688]
+                allocate(Self%GaussPoint(5))
+                allocate(Self%GaussWeights(5))
+                Self%GaussPoint = [-0.90617984d0,-0.53846931d0,0.00000000d0,0.53846931d0,0.90617984d0]
+                Self%GaussWeights = [0.23692688d0,0.47862867d0,0.56888888d0,0.47862867d0,0.23692688d0]
         end select
+        LB = 0.0d0;  UB = 1.0d0
+        Coef1 = (UB - LB)/2.0d0
+        Coef2 = (UB + LB)/2.0d0
+        ! changing coordinates and points due to boundary changes
+        if (Self%ElementType.eq.'tria3'.or.Self%ElementType.eq.'tria6'.or. &
+            Self%ElementType.eq.'tetra4'.or.Self%ElementType.eq.'tetra10') then
+            Self%GaussPoint = Self%GaussPoint*Coef1 + Coef2
+            Self%GaussWeights = Self%GaussWeights*Coef1
+        end if
     end subroutine SetGaussAprox
     ! 7. Input Coordinates
     subroutine SetCoordinates(Self,Path)
@@ -386,7 +403,7 @@ module FEA_Module
     subroutine DiffFormFunction(Self,DiffFunction,e,n,z)
         ! dN1/de     dN2/de     dN3/de      ....     dNn/de
         ! dN1/dn     dN2/dn     dN3/dn      ....     dNn/dn
-        ! dN1/dz     dN2/dz     dN3/dz      ....     dNn/dz (caso 3D)
+        ! dN1/dz     dN2/dz     dN3/dz      ....     dNn/dz (3D)
         implicit none
         class(Structure), intent(inout)                             :: Self
         double precision, intent(inout)                             :: e, n
@@ -394,237 +411,210 @@ module FEA_Module
         double precision, dimension(:,:), allocatable, intent(out)  :: DiffFunction
         if (Self%ElementType.eq.'tria3') then
             allocate(DiffFunction(2,3))
-            ! line 1
-            DiffFunction(1,1) = -1.0d0
-            DiffFunction(1,2) = 1.0d0
-            DiffFunction(1,3) = 0.0d0
-            ! line 2
-            DiffFunction(2,1) = -1.0d0
-            DiffFunction(2,2) = 0.0d0
-            DiffFunction(2,3) = 1.0d0
-        elseif (Self%ElementType.eq.'tria6') then
-            allocate(DiffFunction(2,6))
-            ! line 1
-            DiffFunction(1,1) = 4.0d0*e+4.0d0*n-3.0d0
-            DiffFunction(1,2) = 4.0d0*e-1.0d0
-            DiffFunction(1,3) = 0.0d0
-            DiffFunction(1,4) = 4.0d0-4.0d0*n-8.0d0*e
-            DiffFunction(1,5) = 4.0d0*n
-            DiffFunction(1,6) = -4.0d0*n
-            ! line 2
-            DiffFunction(2,1) = 4.0d0*e+4.0d0*n-3.0d0
-            DiffFunction(2,2) = 0.0d0
-            DiffFunction(2,3) = 4.0d0*n-1.0d0
-            DiffFunction(2,4) = -4.0d0*e
-            DiffFunction(2,5) = 4.0d0*e
-            DiffFunction(2,6) = 4.0d0-8.0d0*n-4.0d0*e
-        elseif (Self%ElementType.eq.'quad4') then
-            allocate(DiffFunction(2,4))
-            ! line 1
-            DiffFunction(1,1) = n/4.0d0-1.0d0/4.0d0
-            DiffFunction(1,2) = 1.0d0/4.0d0-n/4.0d0
-            DiffFunction(1,3) = n/4.0d0+1.0d0/4.0d0
-            DiffFunction(1,4) = -n/4.0d0-1.0d0/4.0d0
-            ! line 2
-            DiffFunction(2,1) = e/4.0d0-1.0d0/4.0d0
-            DiffFunction(2,2) = -e/4.0d0-1.0d0/4.0d0
-            DiffFunction(2,3) = e/4.0d0+1.0d0/4.0d0
-            DiffFunction(2,4) = 1.0d0/4.0d0-e/4.0d0
-        elseif (Self%ElementType.eq.'quad8') then
-            allocate(DiffFunction(2,8))
-            ! line 1
-            DiffFunction(1,1) = -(e/4.0d0-1.0d0/4.0d0)*(n-1.0d0)-((n-1.0d0)*(e+n+1.0d0))/4.0d0
-            DiffFunction(1,2) = ((n-1.0d0)*(n-e+1.0d0))/4.0d0-(e/4.0d0+1.0d0/4.0d0)*(n-1.0d0)
-            DiffFunction(1,3) = (e/4.0d0+1.0d0/4.0d0)*(n+1.0d0)+((n+1.0d0)*(e+n-1.0d0))/4.0d0
-            DiffFunction(1,4) = (e/4.0d0-1.0d0/4.0d0)*(n+1.0d0)+((n+1.0d0)*(e-n+1.0d0))/4.0d0
-            DiffFunction(1,5) = e*(n-1.0d0)
-            DiffFunction(1,6) = 1.0d0/2.0d0-n**2.0d0/2.0d0
-            DiffFunction(1,7) = -e*(n+1.0d0)
-            DiffFunction(1,8) = n**2.0d0/2.0d0-1.0d0/2.0d0
-            ! line 2
-            DiffFunction(2,1) = -(e/4.0d0-1.0d0/4.0d0)*(n-1.0d0)-(e/4.0d0-1.0d0/4.0d0)*(e+n+1.0d0)
-            DiffFunction(2,2) = (e/4.0d0+1.0d0/4.0d0)*(n-e+1.0d0)+(e/4.0d0+1.0d0/4.0d0)*(n-1.0d0)
-            DiffFunction(2,3) = (e/4.0d0+1.0d0/4.0d0)*(n+1.0d0)+(e/4.0d0+1.0d0/4.0d0)*(e+n-1.0d0)
-            DiffFunction(2,4) = (e/4.0d0-1.0d0/4.0d0)*(e-n+1.0d0)-(e/4.0d0-1.0d0/4.0d0)*(n+1.0d0)
-            DiffFunction(2,5) = e**2.0d0/2.0d0-1.0d0/2.0d0
-            DiffFunction(2,6) = -n*(e+1.0d0)
-            DiffFunction(2,7) = 1.0d0/2.0d0-e**2.0d0/2.0d0
-            DiffFunction(2,8) = n*(e-1.0d0)
-        elseif (Self%ElementType.eq.'tetra4') then
-            allocate(DiffFunction(3,4))
-            ! line 1
+            !  line 1
             DiffFunction(1,1) = 1.0d0
             DiffFunction(1,2) = 0.0d0
-            DiffFunction(1,3) = 0.0d0
-            DiffFunction(1,4) = -1.0d0
-            ! line 2
+            DiffFunction(1,3) = - 1.0d0
+            !  line 2
             DiffFunction(2,1) = 0.0d0
             DiffFunction(2,2) = 1.0d0
-            DiffFunction(2,3) = 0.0d0
-            DiffFunction(2,4) = -1.0d0
-            ! line 3
-            DiffFunction(3,1) = 0.0d0
+            DiffFunction(2,3) = - 1.0d0
+        elseif (Self%ElementType.eq.'tria6') then
+            allocate(DiffFunction(2,6))
+            !  line 1
+            DiffFunction(1,1) = 4.0d0*e + 4.0d0*n - 3.0d0 
+            DiffFunction(1,2) = 4.0d0*e - 1.0d0 
+            DiffFunction(1,3) = 0.0d0 
+            DiffFunction(1,4) = 4.0d0 - 4.0d0*n - 8.0d0*e 
+            DiffFunction(1,5) = 4.0d0*n 
+            DiffFunction(1,6) = - 4.0d0*n 
+            !  line 2
+            DiffFunction(2,1) = 4.0d0*e + 4.0d0*n - 3.0d0 
+            DiffFunction(2,2) = 0.0d0 
+            DiffFunction(2,3) = 4.0d0*n - 1.0d0 
+            DiffFunction(2,4) = - 4.0d0*e 
+            DiffFunction(2,5) = 4.0d0*e 
+            DiffFunction(2,6) = 4.0d0 - 8.0d0*n - 4.0d0*e 
+        elseif (Self%ElementType.eq.'quad4') then
+            allocate(DiffFunction(2,4))
+            !  line 1
+            DiffFunction(1,1) = n/4.0d0 - 1.0d0/4.0d0 
+            DiffFunction(1,2) = 1.0d0/4.0d0 - n/4.0d0 
+            DiffFunction(1,3) = n/4.0d0 + 1.0d0/4.0d0 
+            DiffFunction(1,4) = - n/4.0d0 - 1.0d0/4.0d0 
+            !  line 2
+            DiffFunction(2,1) = e/4.0d0 - 1.0d0/4.0d0 
+            DiffFunction(2,2) = - e/4.0d0 - 1.0d0/4.0d0 
+            DiffFunction(2,3) = e/4.0d0 + 1.0d0/4.0d0 
+            DiffFunction(2,4) = 1.0d0/4.0d0 - e/4.0d0 
+        elseif (Self%ElementType.eq.'quad8') then
+            allocate(DiffFunction(2,8))
+            !  line 1
+            DiffFunction(1,1) = - (e/4.0d0 - 1.0d0/4.0d0)*(n - 1.0d0) - ((n - 1.0d0)*(e + n + 1.0d0))/4.0d0 
+            DiffFunction(1,2) = ((n - 1.0d0)*(n - e + 1.0d0))/4.0d0 - (e/4.0d0 + 1.0d0/4.0d0)*(n - 1.0d0) 
+            DiffFunction(1,3) = (e/4.0d0 + 1.0d0/4.0d0)*(n + 1.0d0) + ((n + 1.0d0)*(e + n - 1.0d0))/4.0d0 
+            DiffFunction(1,4) = (e/4.0d0 - 1.0d0/4.0d0)*(n + 1.0d0) + ((n + 1.0d0)*(e - n + 1.0d0))/4.0d0 
+            DiffFunction(1,5) = e*(n - 1.0d0) 
+            DiffFunction(1,6) = 1.0d0/2.0d0 - n**2.0d0/2.0d0 
+            DiffFunction(1,7) = - e*(n + 1.0d0) 
+            DiffFunction(1,8) = n**2.0d0/2.0d0 - 1.0d0/2.0d0 
+            !  line 2
+            DiffFunction(2,1) = - (e/4.0d0 - 1.0d0/4.0d0)*(n - 1.0d0) - (e/4.0d0 - 1.0d0/4.0d0)*(e + n + 1.0d0) 
+            DiffFunction(2,2) = (e/4.0d0 + 1.0d0/4.0d0)*(n - e + 1.0d0) + (e/4.0d0 + 1.0d0/4.0d0)*(n - 1.0d0) 
+            DiffFunction(2,3) = (e/4.0d0 + 1.0d0/4.0d0)*(n + 1.0d0) + (e/4.0d0 + 1.0d0/4.0d0)*(e + n - 1.0d0) 
+            DiffFunction(2,4) = (e/4.0d0 - 1.0d0/4.0d0)*(e - n + 1.0d0) - (e/4.0d0 - 1.0d0/4.0d0)*(n + 1.0d0) 
+            DiffFunction(2,5) = e**2.0d0/2.0d0 - 1.0d0/2.0d0 
+            DiffFunction(2,6) = - 2.0d0*n*(e/2.0d0 + 1.0d0/2.0d0) 
+            DiffFunction(2,7) = 1.0d0/2.0d0 - e**2.0d0/2.0d0 
+            DiffFunction(2,8) = 2.0d0*n*(e/2.0d0 - 1.0d0/2.0d0) 
+        elseif (Self%ElementType.eq.'tetra4') then
+            allocate(DiffFunction(3,4))
+            !  line 1
+            DiffFunction(1,1) = - 1.0d0 
+            DiffFunction(1,2) = 1.0d0
+            DiffFunction(1,3) = 0.0d0
+            DiffFunction(1,4) = 0.0d0
+            !  line 2
+            DiffFunction(2,1) = - 1.0d0
+            DiffFunction(2,2) = 0.0d0
+            DiffFunction(2,3) = 1.0d0
+            DiffFunction(2,4) = 0.0d0
+            !  line 3
+            DiffFunction(3,1) = - 1.0d0
             DiffFunction(3,2) = 0.0d0
-            DiffFunction(3,3) = 1.0d0
-            DiffFunction(3,4) = -1.0d0
+            DiffFunction(3,3) = 0.0d0
+            DiffFunction(3,4) = 1.0d0
         elseif (Self%ElementType.eq.'tetra10') then
             allocate(DiffFunction(3,10))
-            ! line 1
-            DiffFunction(1,1) = 4.0d0*e-1.0d0
-            DiffFunction(1,2) = 0.0d0
-            DiffFunction(1,3) = 0.0d0
-            DiffFunction(1,4) = 4.0d0*e+4.0d0*n+4.0d0*z-3.0d0
-            DiffFunction(1,5) = 4.0d0*n
-            DiffFunction(1,6) = 0.0d0
-            DiffFunction(1,7) = 4.0d0*z
-            DiffFunction(1,8) = 4.0d0-4.0d0*n-4.0d0*z-8.0d0*e
-            DiffFunction(1,9) = -4.0d0*n
-            DiffFunction(1,10) = 0.0d0
-            ! line 2
-            DiffFunction(2,1) = 0.0d0
-            DiffFunction(2,2) = 4.0d0*n-1.0d0
-            DiffFunction(2,3) = 0.0d0
-            DiffFunction(2,4) = 4.0d0*e+4.0d0*n+4.0d0*z-3.0d0
-            DiffFunction(2,5) = 4.0d0*e
-            DiffFunction(2,6) = 4.0d0*z
-            DiffFunction(2,7) = 0.0d0
-            DiffFunction(2,8) = -4.0d0*e
-            DiffFunction(2,9) = 4.0d0-8.0d0*n-4.0d0*z-4.0d0*e
-            DiffFunction(2,10) = 0.0d0
-            ! line 3
-            DiffFunction(3,1) = 0.0d0
-            DiffFunction(3,2) = 0.0d0
-            DiffFunction(3,3) = 4.0d0*z-1.0d0
-            DiffFunction(3,4) = 4.0d0*e+4.0d0*n+4.0d0*z-3.0d0
-            DiffFunction(3,5) = 0.0d0
-            DiffFunction(3,6) = 4.0d0*n
-            DiffFunction(3,7) = 4.0d0*e
-            DiffFunction(3,8) = -4.0d0*e
-            DiffFunction(3,8) = -4.0d0*n
-            DiffFunction(3,8) = 0.0d0
+            !  line 1
+            DiffFunction(1,1) = 4.0d0*e + 4.0d0*n + 4.0d0*z - 3.0d0 
+            DiffFunction(1,2) = 4.0d0*e - 1.0d0 
+            DiffFunction(1,3) = 0.0d0 
+            DiffFunction(1,4) = 0.0d0 
+            DiffFunction(1,5) = 4.0d0 - 4.0d0*n - 4.0d0*z - 8.0d0*e 
+            DiffFunction(1,6) = 4.0d0*n 
+            DiffFunction(1,7) = - 4.0d0*n 
+            DiffFunction(1,8) = 4.0d0*z 
+            DiffFunction(1,9) = 0 
+            DiffFunction(1,10) = - 4.0d0*z 
+            !  line 2
+            DiffFunction(2,1) = 4.0d0*e + 4.0d0*n + 4.0d0*z - 3.0d0 
+            DiffFunction(2,2) = 0.0d0 
+            DiffFunction(2,3) = 4.0d0*n - 1.0d0 
+            DiffFunction(2,4) = 0.0d0 
+            DiffFunction(2,5) = - 4.0d0*e 
+            DiffFunction(2,6) = 4.0d0*e 
+            DiffFunction(2,7) = 4.0d0 - 8.0d0*n - 4.0d0*z - 4.0d0*e 
+            DiffFunction(2,8) = 0.0d0 
+            DiffFunction(2,9) = 4.0d0*z 
+            DiffFunction(2,10) = - 4.0d0*z 
+            !  line 3
+            DiffFunction(3,1) = 4.0d0*e + 4.0d0*n + 4.0d0*z - 3.0d0 
+            DiffFunction(3,2) = 0.0d0 
+            DiffFunction(3,3) = 0.0d0 
+            DiffFunction(3,4) = 4.0d0*z - 1.0d0 
+            DiffFunction(3,5) = - 4.0d0*e 
+            DiffFunction(3,6) = 0.0d0 
+            DiffFunction(3,7) = - 4.0d0*n 
+            DiffFunction(3,8) = 4.0d0*e 
+            DiffFunction(3,9) = 4.0d0*n 
+            DiffFunction(3,10) = 4.0d0 - 4.0d0*n - 8.0d0*z - 4.0d0*e 
         elseif (Self%ElementType.eq.'hexa8') then
             allocate(DiffFunction(3,8))
-            ! line 1
-            DiffFunction(1,1) = (e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)+((n-1.0d0)*(e+n+z))/8.0d0
-            DiffFunction(1,2) = -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)-((n-1.0d0)*(e+n+z))/8.0d0
-            DiffFunction(1,3) = (e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)+((n+1.0d0)*(e+n+z))/8.0d0
-            DiffFunction(1,4) = -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)-((n+1.0d0)*(e+n+z))/8.0d0
-            DiffFunction(1,5) = -(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)-((n-1.0d0)*(e+n+z-2.0d0))/8.0d0
-            DiffFunction(1,6) = (e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)+((n-1.0d0)*(e+n+z-2.0d0))/8.0d0
-            DiffFunction(1,7) = -(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)-((n+1.0d0)*(e+n+z-2.0d0))/8.0d0
-            DiffFunction(1,8) = (e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)+((n+1.0d0)*(e+n+z-2.0d0))/8.0d0
-            ! line 2
-            DiffFunction(2,1) = (e/8.0d0-1.0d0/8.0d0)*(e+n+z)+(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(2,2) = -(e/8.0d0+1.0d0/8.0d0)*(e+n+z)-(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(2,3) = (e/8.0d0+1.0d0/8.0d0)*(e+n+z)+(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)
-            DiffFunction(2,4) = -(e/8.0d0-1.0d0/8.0d0)*(e+n+z)-(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)
-            DiffFunction(2,5) = -(e/8.0d0-1.0d0/8.0d0)*(e+n+z-2.0d0)-(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(2,6) = (e/8.0d0+1.0d0/8.0d0)*(e+n+z-2.0d0)+(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(2,7) = -(e/8.0d0+1.0d0/8.0d0)*(e+n+z-2.0d0)-(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)
-            DiffFunction(2,8) = (e/8.0d0-1.0d0/8.0d0)*(e+n+z-2.0d0)+(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)
-            ! line 3
-            DiffFunction(3,1) = (e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(3,2) = -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(3,3) = (e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)
-            DiffFunction(3,4) = -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)
-            DiffFunction(3,5) = -(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(3,6) = (e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)
-            DiffFunction(3,7) = -(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)
-            DiffFunction(3,8) = (e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)
+            !  line 1
+            DiffFunction(1,1) = - ((n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,2) = ((n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,3) = - ((n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,4) = ((n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,5) = ((n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,6) = - ((n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,7) = ((n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,8) = - ((n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            !  line 2
+            DiffFunction(2,1) = - (e/8.0d0 - 1.0d0/8.0d0)*(z - 1.0d0) 
+            DiffFunction(2,2) = (e/8.0d0 + 1.0d0/8.0d0)*(z - 1.0d0) 
+            DiffFunction(2,3) = - (e/8.0d0 + 1.0d0/8.0d0)*(z - 1.0d0) 
+            DiffFunction(2,4) = (e/8.0d0 - 1.0d0/8.0d0)*(z - 1.0d0) 
+            DiffFunction(2,5) = (e/8.0d0 - 1.0d0/8.0d0)*(z + 1.0d0) 
+            DiffFunction(2,6) = - (e/8.0d0 + 1.0d0/8.0d0)*(z + 1.0d0) 
+            DiffFunction(2,7) = (e/8.0d0 + 1.0d0/8.0d0)*(z + 1.0d0) 
+            DiffFunction(2,8) = - (e/8.0d0 - 1.0d0/8.0d0)*(z + 1.0d0) 
+            !  line 3
+            DiffFunction(3,1) = - (e/8.0d0 - 1.0d0/8.0d0)*(n - 1.0d0) 
+            DiffFunction(3,2) = (e/8.0d0 + 1.0d0/8.0d0)*(n - 1.0d0) 
+            DiffFunction(3,3) = - (e/8.0d0 + 1.0d0/8.0d0)*(n + 1.0d0) 
+            DiffFunction(3,4) = (e/8.0d0 - 1.0d0/8.0d0)*(n + 1.0d0) 
+            DiffFunction(3,5) = (e/8.0d0 - 1.0d0/8.0d0)*(n - 1.0d0) 
+            DiffFunction(3,6) = - (e/8.0d0 + 1.0d0/8.0d0)*(n - 1.0d0) 
+            DiffFunction(3,7) = (e/8.0d0 + 1.0d0/8.0d0)*(n + 1.0d0) 
+            DiffFunction(3,8) = - (e/8.0d0 - 1.0d0/8.0d0)*(n + 1.0d0) 
         elseif (Self%ElementType.eq.'hexa20') then
             allocate(DiffFunction(3,20))
-            ! line 1
-            DiffFunction(1,1) = (e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(z-3.0d0)+((n-1.0d0)*(z-3.0d0)*(e+n+z))/8.0d0
-            DiffFunction(1,2) = -((n-1.0d0)*(2.0d0*e+z-3.0d0)*(e+n+z))/8.0d0-(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*e+z-3.0d0) &
-                                -2.0d0*(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(e+n+z)
-            DiffFunction(1,3) = ((n+1.0d0)*(e+n+z)*(2.0d0*e+2.0d0*n+z-3.0d0))/8.0d0 &
-                                +(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+z-3.0d0) &
-                                +2.0d0*(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(e+n+z)
-            DiffFunction(1,4) = -((n+1.0d0)*(2.0d0*n+z-3.0d0)*(e+n+z))/8.0d0-(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*n+z-3.0d0)
-            DiffFunction(1,5) = ((n-1.0d0)*(2.0d0*e+2.0d0*n+z+1.0d0)*(e+n+z-2.0d0))/8.0d0 &
-                                +(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+z+1.0d0) &
-                                +2.0d0*(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(1,6) = -((n-1.0d0)*(2.0d0*n+z+1.0d0)*(e+n+z-2.0d0))/8.0d0 &
-                                -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*n+z+1.0d0)
-            DiffFunction(1,7) = (e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(z+1.0d0)+((n+1.0d0)*(z+1.0d0)*(e+n+z-2.0d0))/8.0d0
-            DiffFunction(1,8) = -((n+1.0d0)*(2.0d0*e+z+1.0d0)*(e+n+z-2.0d0))/8.0d0 &
-                                -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*e+z+1.0d0) &
-                                -2.0d0*(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(1,9) = (e**2.0d0/4.0d0-1.0d0/4.0d0)*(n-1.0d0)+(e*(n-1.0d0)*(e+n+z))/2.0d0
-            DiffFunction(1,10) = -((n**2.0d0-1.0d0)*(e+n+z))/4.0d0-(e/4.0d0+1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(1,11) = -(e**2.0d0/4.0d0-1.0d0/4.0d0)*(n+1.0d0)-(e*(n+1.0d0)*(e+n+z))/2.0d0
-            DiffFunction(1,12) = ((n**2.0d0-1.0d0)*(e+n+z))/4.0d0+(e/4.0d0-1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(1,13) = 0.0d0
-            DiffFunction(1,14) = ((n**2.0d0-1.0d0)*(e+n+z-2.0d0))/4.0d0+(e/4.0d0+1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(1,15) = (e**2.0d0/4.0d0-1.0d0/4.0d0)*(n+1.0d0)+(e*(n+1.0d0)*(e+n+z-2.0d0))/2.0d0
-            DiffFunction(1,16) = -((n**2.0d0-1.0d0)*(e+n+z-2.0d0))/4.0d0-(e/4.0d0-1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(1,17) = -(((e+n+z-1.0d0)**2.0d0-1.0d0)*(n-1.0d0))/4.0d0 &
-                                 -(e/4.0d0-1.0d0/4.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(1,18) = (((e+n+z-1.0d0)**2.0d0-1.0d0)*(n-1.0d0))/4.0d0 &
-                                 +(e/4.0d0+1.0d0/4.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(1,19) = -(((e+n+z-1.0d0)**2.0d0-1.0d0)*(n+1.0d0))/4.0d0 &
-                                 -(e/4.0d0+1.0d0/4.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(1,20) = (((e+n+z-1.0d0)**2.0d0-1.0d0)*(n+1.0d0))/4.0d0 &
-                                 +(e/4.0d0-1.0d0/4.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            ! line 2
-            DiffFunction(2,1) = (e/8.0d0-1.0d0/8.0d0)*(z-3.0d0)*(e+n+z)+(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(z-3.0d0)
-            DiffFunction(2,2) = -(e/8.0d0+1.0d0/8.0d0)*(2.0d0*e+z-3.0d0)*(e+n+z) &
-                                -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*e+z-3.0d0)
-            DiffFunction(2,3) = (e/8.0d0+1.0d0/8.0d0)*(e+n+z)*(2.0d0*e+2.0d0*n+z-3.0d0) &
-                                +(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+z-3.0d0) &
-                                +2.0d0*(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(e+n+z)
-            DiffFunction(2,4) = -(e/8.0d0-1.0d0/8.0d0)*(2.0d0*n+z-3.0d0)*(e+n+z) &
-                                -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*n+z-3.0d0) &
-                                -2.0d0*(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(e+n+z)
-            DiffFunction(2,5) = (e/8.0d0-1.0d0/8.0d0)*(2.0d0*e+2.0d0*n+z+1.0d0)*(e+n+z-2.0d0) &
-                                +(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+z+1.0d0) &
-                                +2.0d0*(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(2,6) = -(e/8.0d0+1.0d0/8.0d0)*(2.0d0*n+z+1.0d0)*(e+n+z-2.0d0) &
-                                -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*n+z+1.0d0) &
-                                -2.0d0*(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(2,7) = (e/8.0d0+1.0d0/8.0d0)*(z+1.0d0)*(e+n+z-2.0d0)+(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(z+1.0d0)
-            DiffFunction(2,8) = -(e/8.0d0-1.0d0/8.0d0)*(2.0d0*e+z+1.0d0)*(e+n+z-2.0d0) &
-                                -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*e+z+1.0d0)
-            DiffFunction(2,9) = (e**2.0d0/4.0d0-1.0d0/4.0d0)*(e+n+z)+(e**2.0d0/4.0d0-1.0d0/4.0d0)*(n-1.0d0)
-            DiffFunction(2,10) = -(e/4.0d0+1.0d0/4.0d0)*(n**2.0d0-1.0d0)-2.0d0*n*(e/4.0d0+1.0d0/4.0d0)*(e+n+z)
-            DiffFunction(2,11) = -(e**2.0d0/4.0d0-1.0d0/4.0d0)*(e+n+z)-(e**2.0d0/4.0d0-1.0d0/4.0d0)*(n+1.0d0)
-            DiffFunction(2,12) = (e/4.0d0-1.0d0/4.0d0)*(n**2.0d0-1.0d0)+2.0d0*n*(e/4.0d0-1.0d0/4.0d0)*(e+n+z)
-            DiffFunction(2,13) = 0.0d0
-            DiffFunction(2,14) = (e/4.0d0+1.0d0/4.0d0)*(n**2.0d0-1.0d0)+2.0d0*n*(e/4.0d0+1.0d0/4.0d0)*(e+n+z-2.0d0)
-            DiffFunction(2,15) = (e**2.0d0/4.0d0-1.0d0/4.0d0)*(e+n+z-2.0d0)+(e**2.0d0/4.0d0-1.0d0/4.0d0)*(n+1.0d0)
-            DiffFunction(2,16) = -(e/4.0d0-1.0d0/4.0d0)*(n**2.0d0-1.0d0)-2.0d0*n*(e/4.0d0-1.0d0/4.0d0)*(e+n+z-2.0d0)
-            DiffFunction(2,17) = -(e/4.0d0-1.0d0/4.0d0)*((e+n+z-1.0d0)**2.0d0-1.0d0) &
-                                -(e/4.0d0-1.0d0/4.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(2,18) = (e/4.0d0+1.0d0/4.0d0)*((e+n+z-1.0d0)**2.0d0-1.0d0) &
-                                +(e/4.0d0+1.0d0/4.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(2,19) = -(e/4.0d0+1.0d0/4.0d0)*((e+n+z-1.0d0)**2.0d0-1.0d0) &
-                                -(e/4.0d0+1.0d0/4.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(2,20) = (e/4.0d0-1.0d0/4.0d0)*((e+n+z-1.0d0)**2.0d0-1.0d0) &
-                                +(e/4.0d0-1.0d0/4.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            ! line 3
-            DiffFunction(3,1) = (e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(z-3.0d0)+(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(e+n+z)
-            DiffFunction(3,2) = -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*e+z-3.0d0)-(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(e+n+z)
-            DiffFunction(3,3) = (e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+z-3.0d0)+(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(e+n+z)
-            DiffFunction(3,4) = -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*n+z-3.0d0)-(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(e+n+z)
-            DiffFunction(3,5) = (e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+z+1.0d0) &
-                                +(e/8.0d0-1.0d0/8.0d0)*(n-1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(3,6) = -(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(2.0d0*n+z+1.0d0)-(e/8.0d0+1.0d0/8.0d0)*(n-1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(3,7) = (e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(z+1.0d0)+(e/8.0d0+1.0d0/8.0d0)*(n+1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(3,8) = -(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(2.0d0*e+z+1.0d0)-(e/8.0d0-1.0d0/8.0d0)*(n+1.0d0)*(e+n+z-2.0d0)
-            DiffFunction(3,9) = (e**2.0d0/4.0d0-1.0d0/4.0d0)*(n-1.0d0)
-            DiffFunction(3,10) = -(e/4.0d0+1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(3,11) = -(e**2.0d0/4.0d0-1.0d0/4.0d0)*(n+1.0d0)
-            DiffFunction(3,12) = (e/4.0d0-1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(3,13) = 0.0d0
-            DiffFunction(3,14) = (e/4.0d0+1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(3,15) = (e**2.0d0/4.0d0-1.0d0/4.0d0)*(n+1.0d0)
-            DiffFunction(3,16) = -(e/4.0d0-1.0d0/4.0d0)*(n**2.0d0-1.0d0)
-            DiffFunction(3,17) = -(e/4.0d0-1.0d0/4.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(3,18) = (e/4.0d0+1.0d0/4.0d0)*(n-1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(3,19) = -(e/4.0d0+1.0d0/4.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
-            DiffFunction(3,20) = (e/4.0d0-1.0d0/4.0d0)*(n+1.0d0)*(2.0d0*e+2.0d0*n+2.0d0*z-2.0d0)
+            !  line 1
+            DiffFunction(1,1) = - (e*n*z*(n - 1.0d0)*(z - 1.0d0))/8.0d0 - (n*z*(e - 1.0d0)*(n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,2) = (e*n*z*(n - 1.0d0)*(z - 1.0d0))/8.0d0 + (n*z*(e + 1.0d0)*(n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,3) = - (e*n*z*(n + 1.0d0)*(z - 1.0d0))/8.0d0 - (n*z*(e + 1.0d0)*(n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,4) = (e*n*z*(n + 1.0d0)*(z - 1.0d0))/8.0d0 + (n*z*(e - 1.0d0)*(n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(1,5) = (e*n*z*(n - 1.0d0)*(z + 1.0d0))/8.0d0 + (n*z*(e - 1.0d0)*(n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,6) = - (e*n*z*(n - 1.0d0)*(z + 1.0d0))/8.0d0 - (n*z*(e + 1.0d0)*(n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,7) = (e*n*z*(n + 1.0d0)*(z + 1.0d0))/8.0d0 + (n*z*(e + 1.0d0)*(n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,8) = - (e*n*z*(n + 1.0d0)*(z + 1.0d0))/8.0d0 - (n*z*(e - 1.0d0)*(n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(1,9) = - (e*(n - 1.0d0)*(z - 1.0d0))/2.0d0 
+            DiffFunction(1,10) = (e*(n + 1.0d0)*(z - 1.0d0))/2.0d0 
+            DiffFunction(1,11) = - (e*(n + 1.0d0)*(z + 1.0d0))/2.0d0 
+            DiffFunction(1,12) = (e*(n - 1.0d0)*(z + 1.0d0))/2.0d0 
+            DiffFunction(1,13) = - ((n**2.0d0 - 1.0d0)*(z - 1.0d0))/4.0d0 
+            DiffFunction(1,14) = ((n**2.0d0 - 1.0d0)*(z - 1.0d0))/4.0d0 
+            DiffFunction(1,15) = - ((n**2.0d0 - 1.0d0)*(z + 1.0d0))/4.0d0 
+            DiffFunction(1,16) = ((n**2.0d0 - 1.0d0)*(z + 1.0d0))/4.0d0 
+            DiffFunction(1,17) = - ((z**2.0d0 - 1.0d0)*(n - 1.0d0))/4.0d0 
+            DiffFunction(1,18) = ((z**2.0d0 - 1.0d0)*(n - 1.0d0))/4.0d0 
+            DiffFunction(1,19) = - ((z**2.0d0 - 1.0d0)*(n + 1.0d0))/4.0d0 
+            DiffFunction(1,20) = ((z**2.0d0 - 1.0d0)*(n + 1.0d0))/4.0d0 
+            !  line 2
+            DiffFunction(2,1) = - (e*n*z*(e - 1.0d0)*(z - 1.0d0))/8.0d0 - (e*z*(e - 1.0d0)*(n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(2,2) = (e*n*z*(e + 1.0d0)*(z - 1.0d0))/8.0d0 + (e*z*(e + 1.0d0)*(n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(2,3) = - (e*n*z*(e + 1.0d0)*(z - 1.0d0))/8.0d0 - (e*z*(e + 1.0d0)*(n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(2,4) = (e*n*z*(e - 1.0d0)*(z - 1.0d0))/8.0d0 + (e*z*(e - 1.0d0)*(n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(2,5) = (e*n*z*(e - 1.0d0)*(z + 1.0d0))/8.0d0 + (e*z*(e - 1.0d0)*(n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(2,6) = - (e*n*z*(e + 1.0d0)*(z + 1.0d0))/8.0d0 - (e*z*(e + 1.0d0)*(n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(2,7) = (e*n*z*(e + 1.0d0)*(z + 1.0d0))/8.0d0 + (e*z*(e + 1.0d0)*(n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(2,8) = - (e*n*z*(e - 1.0d0)*(z + 1.0d0))/8.0d0 - (e*z*(e - 1.0d0)*(n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(2,9) = - (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(z - 1.0d0) 
+            DiffFunction(2,10) = (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(z - 1.0d0) 
+            DiffFunction(2,11) = - (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(z + 1.0d0) 
+            DiffFunction(2,12) = (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(z + 1.0d0) 
+            DiffFunction(2,13) = - 2.0d0*n*(e/4.0d0 - 1.0d0/4.0d0)*(z - 1.0d0) 
+            DiffFunction(2,14) = 2.0d0*n*(e/4.0d0 + 1.0d0/4.0d0)*(z - 1.0d0) 
+            DiffFunction(2,15) = - 2.0d0*n*(e/4.0d0 + 1.0d0/4.0d0)*(z + 1.0d0) 
+            DiffFunction(2,16) = 2.0d0*n*(e/4.0d0 - 1.0d0/4.0d0)*(z + 1.0d0) 
+            DiffFunction(2,17) = - (e/4.0d0 - 1.0d0/4.0d0)*(z**2.0d0 - 1.0d0) 
+            DiffFunction(2,18) = (e/4.0d0 + 1.0d0/4.0d0)*(z**2.0d0 - 1.0d0) 
+            DiffFunction(2,19) = - (e/4.0d0 + 1.0d0/4.0d0)*(z**2.0d0 - 1.0d0) 
+            DiffFunction(2,20) = (e/4.0d0 - 1.0d0/4.0d0)*(z**2.0d0 - 1.0d0) 
+            !  line 3
+            DiffFunction(3,1) = - (e*n*z*(e - 1.0d0)*(n - 1.0d0))/8.0d0 - (e*n*(e - 1.0d0)*(n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(3,2) = (e*n*z*(e + 1.0d0)*(n - 1.0d0))/8.0d0 + (e*n*(e + 1.0d0)*(n - 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(3,3) = - (e*n*z*(e + 1.0d0)*(n + 1.0d0))/8.0d0 - (e*n*(e + 1.0d0)*(n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(3,4) = (e*n*z*(e - 1.0d0)*(n + 1.0d0))/8.0d0 + (e*n*(e - 1.0d0)*(n + 1.0d0)*(z - 1.0d0))/8.0d0 
+            DiffFunction(3,5) = (e*n*z*(e - 1.0d0)*(n - 1.0d0))/8.0d0 + (e*n*(e - 1.0d0)*(n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(3,6) = - (e*n*z*(e + 1.0d0)*(n - 1.0d0))/8.0d0 - (e*n*(e + 1.0d0)*(n - 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(3,7) = (e*n*z*(e + 1.0d0)*(n + 1.0d0))/8.0d0 + (e*n*(e + 1.0d0)*(n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(3,8) = - (e*n*z*(e - 1.0d0)*(n + 1.0d0))/8.0d0 - (e*n*(e - 1.0d0)*(n + 1.0d0)*(z + 1.0d0))/8.0d0 
+            DiffFunction(3,9) = - (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(n - 1.0d0) 
+            DiffFunction(3,10) = (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(n + 1.0d0) 
+            DiffFunction(3,11) = - (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(n + 1.0d0) 
+            DiffFunction(3,12) = (e**2.0d0/4.0d0 - 1.0d0/4.0d0)*(n - 1.0d0) 
+            DiffFunction(3,13) = - (e/4.0d0 - 1.0d0/4.0d0)*(n**2.0d0 - 1.0d0) 
+            DiffFunction(3,14) = (e/4.0d0 + 1.0d0/4.0d0)*(n**2.0d0 - 1.0d0) 
+            DiffFunction(3,15) = - (e/4.0d0 + 1.0d0/4.0d0)*(n**2.0d0 - 1.0d0) 
+            DiffFunction(3,16) = (e/4.0d0 - 1.0d0/4.0d0)*(n**2.0d0 - 1.0d0) 
+            DiffFunction(3,17) = - 2.0d0*z*(e/4.0d0 - 1.0d0/4.0d0)*(n - 1.0d0) 
+            DiffFunction(3,18) = 2.0d0*z*(e/4.0d0 + 1.0d0/4.0d0)*(n - 1.0d0) 
+            DiffFunction(3,19) = - 2.0d0*z*(e/4.0d0 + 1.0d0/4.0d0)*(n + 1.0d0) 
+            DiffFunction(3,20) = 2.0d0*z*(e/4.0d0 - 1.0d0/4.0d0)*(n + 1.0d0) 
         else
-            stop "ERROR, in Diff DiffFormFunction, problem with ElementType"
+            stop "ERROR, in DiffFormFunction, problem with ElementType"
         end if
     end subroutine DiffFormFunction
     ! 2. Elascitity Tensor
@@ -637,27 +627,27 @@ module FEA_Module
         V = Self%PoissonModulus    
         if (Self%AnalysisType.eq.'PlaneStress') then
             allocate(ETensor(3,3))
-            Constant = E/(1.0d0-V**2d0)
+            Constant = E/(1.0d0 - V**2.0d0)
             ETensor(1,:) = [1.0d0,V,0.0d0]
             ETensor(2,:) = [V,1.0d0,0.0d0]
             ETensor(3,:) = [0.0d0,0.0d0,(1.0-V)/2.0d0]
             ETensor = Constant*ETensor
         elseif (Self%AnalysisType.eq.'PlaneStrain') then
             allocate(ETensor(3,3))
-            Constant = E/((1.0d0+V)*(1.0d0-2.0d0*V))
+            Constant = E/((1.0d0 + V)*(1.0d0 - 2.0d0*V))
             ETensor(1,:) = [1.0d0-V,V,0.0d0]
             ETensor(2,:) = [V,1.0d0-V,0.0d0]
             ETensor(3,:) = [0.0d0,0.0d0,(1.0d0-2.0d0*V)/2.0d0]
             ETensor = Constant*ETensor
-        elseif (Self%AnalysisType.eq.'HookeLaw') then
+        elseif (Self%AnalysisType.eq.'SolidIso') then
             allocate(ETensor(6,6))
-            Constant = E/((1.0d0+V)*(1.0d0-2.0d0*V))
-            ETensor(1,:) = [1.0d0-V,V,V,0.0d0,0.0d0,0.0d0]
-            ETensor(2,:) = [V,1.0d0-V,V,0.0d0,0.0d0,0.0d0]
-            ETensor(3,:) = [V,V,1.0d0-V,0.0d0,0.0d0,0.0d0]
-            ETensor(4,:) = [0.0d0,0.0d0,0.0d0,(1.0d0-2.0d0*V)/2.0d0,0.0d0,0.0d0]
-            ETensor(5,:) = [0.0d0,0.0d0,0.0d0,0.0d0,(1.0d0-2.0d0*V)/2.0d0,0.0d0]
-            ETensor(6,:) = [0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,(1.0d0-2.0d0*V)/2.0d0]
+            Constant = E*(1.0d0-v)/((1.0d0+V)*(1.0d0-2.0d0*V))
+            ETensor(1,:) = [1.0d0,V/(1.0d0-v),V/(1.0d0-v),0.0d0,0.0d0,0.0d0]
+            ETensor(2,:) = [V/(1.0d0-v),1.0d0,V/(1.0d0-v),0.0d0,0.0d0,0.0d0]
+            ETensor(3,:) = [V/(1.0d0-v),V/(1.0d0-v),1.0d0,0.0d0,0.0d0,0.0d0]
+            ETensor(4,:) = [0.0d0,0.0d0,0.0d0,(1.0d0-2.0d0*V)/(2.0d0*(1.0d0-v)),0.0d0,0.0d0]
+            ETensor(5,:) = [0.0d0,0.0d0,0.0d0,0.0d0,(1.0d0-2.0d0*V)/(2.0d0*(1.0d0-v)),0.0d0]
+            ETensor(6,:) = [0.0d0,0.0d0,0.0d0,0.0d0,0.0d0,(1.0d0-2.0d0*V)/(2.0d0*(1.0d0-v))]
             ETensor = Constant*ETensor
         end if
     end subroutine ElasticityTensor
@@ -669,7 +659,7 @@ module FEA_Module
         double precision, dimension(:), allocatable, intent(inout)  :: DensityVector 
         ! internal variables
         integer                                                     :: el,i,j,k,l,m
-        double precision                                            :: e,n,z,w1,w2,w3,DetJacobian
+        double precision                                            :: e,n,z,w1,w2,w3,DetJacobian,Fac
         double precision, dimension(:,:), allocatable               :: Be,Jacobian,InvJacobian,D
         double precision, dimension(:,:), allocatable               :: DiffN,DiffNXY,ElementCoordinates
         ! ---- 1st part ----
@@ -701,29 +691,23 @@ module FEA_Module
                         n = Self%GaussPoint(j)
                         w2 = Self%GaussWeights(j)
                         call DiffFormFunction(Self,DiffN,e,n)
-                        ! Jacobian
-                        do k = 1, 2, 1
-                            do l = 1, 2, 1
-                                Jacobian(k,l) = dot_product(DiffN(k,:),ElementCoordinates(:,l))
-                            end do
-                        end do
+                        Jacobian = matmul(DiffN,ElementCoordinates)
                         InvJacobian = Inverse(Jacobian)
                         DetJacobian = Determinant(Jacobian)
                         DiffNXY = matmul(InvJacobian,DiffN)
+                        Fac = DetJacobian*w1*w2*(Self%Thickness)
                         ! Be
                         Be = 0.0d0
                         do k = 1, size(DiffN,2), 1
                             Be(1,2*k-1) = DiffNxy(1,k)
-                            !Be(1,2*k) = 0.0d0
-                            !Be(2,2*k-1) = 0.0d0
                             Be(2,2*k) = DiffNxy(2,k)
                             Be(3,2*k-1) = DiffNxy(2,k)
                             Be(3,2*k) = DiffNxy(1,k)
                         end do
                         ! Be Local
-                        Self%BLocal(el,:,:) = Self%BLocal(el,:,:) + Be*w1*w2
+                        Self%BLocal(el,:,:) = Self%BLocal(el,:,:) + Fac*Be
                         ! K Local
-                        Self%KLocal(el,:,:) = Self%KLocal(el,:,:) + abs(DetJacobian)*(matmul(transpose(Be),matmul(D,Be)))*&
+                        Self%KLocal(el,:,:) = Self%KLocal(el,:,:) + Fac*(matmul(transpose(Be),matmul(D,Be)))*&
                                                                     w1*w2*(Self%Thickness)
                         deallocate(DiffN)
                     end do
@@ -759,42 +743,27 @@ module FEA_Module
                             z = Self%GaussPoint(k)
                             w3 = Self%GaussWeights(k)
                             call DiffFormFunction(Self,DiffN,e,n,z)
-                            ! Jacobian
-                            do l = 1, 3, 1
-                                do m = 1, 3, 1
-                                    Jacobian(l,m) = dot_product(DiffN(l,:),ElementCoordinates(:,m))
-                                end do
-                            end do
+                            Jacobian = matmul(DiffN,ElementCoordinates)
                             InvJacobian = Inverse(Jacobian)
                             DetJacobian = Determinant(Jacobian)
                             DiffNXY = matmul(InvJacobian,DiffN)
+                            Fac = DetJacobian*w1*w2*w3
                             ! Be
-                            Be = 0.0d0
                             do l = 1, size(DiffN,2), 1
                                 Be(1,3*l-2) = DiffNxy(1,l)
-                                !Be(1,3*l-1) = 0.0d0
-                                !Be(1,3*l) = 0.0d0
-                                !Be(2,3*l-2) = 0.0d0
                                 Be(2,3*l-1) = DiffNxy(2,l)
-                                !Be(2,3*l) = 0.0d0
-                                !Be(3,3*l-2) = 0.0d0
-                                !Be(3,3*l-1) = 0.0d0
                                 Be(3,3*l) = DiffNxy(3,l)
                                 Be(4,3*l-2) = DiffNxy(2,l)
                                 Be(4,3*l-1) = DiffNxy(1,l)
-                                !Be(4,3*l) = 0.0d0
-                                !Be(5,3*l-2) = 0.0d0
                                 Be(5,3*l-1) = DiffNxy(3,l)
                                 Be(5,3*l) = DiffNxy(2,l)
                                 Be(6,3*l-2) = DiffNxy(3,l)
-                                !Be(6,3*l-1) = 0.0d0
                                 Be(6,3*l) = DiffNxy(1,l)
                             end do
                             ! Be Local
-                            Self%BLocal(el,:,:) = Self%BLocal(el,:,:) + Be*w1*w2*w3
+                            Self%BLocal(el,:,:) = Self%BLocal(el,:,:) + Fac*Be
                             ! K Local
-                            Self%KLocal(el,:,:) = Self%KLocal(el,:,:) + abs(DetJacobian)*(matmul(transpose(Be),matmul(D,Be)))*&
-                                                                            w1*w2*w3
+                            Self%KLocal(el,:,:) = Self%KLocal(el,:,:) + Fac*(matmul(transpose(Be),matmul(D,Be)))
                             deallocate(DiffN)
                         end do
                     end do
@@ -820,14 +789,14 @@ module FEA_Module
         ! -------------------------------------------------------------------------------------- !
         ! get de element and DoF incidence for each DoF (only the free degres)
         j = size(Self%FreeD)
-        ! maximum of 20 elements per node
-        allocate(Elem_Interaction(j,20))
+        ! maximum of 50 elements per node
+        allocate(Elem_Interaction(j,50))
         Elem_Interaction = 0
         ! considering the quad20 20*20 
-        allocate(Node_Interaction(j,400))
+        allocate(Node_Interaction(j,600))
         Node_Interaction = 0
 
-        !$OMP PARALLEL DO
+        !$omp parallel do private(InLogical,InPosition)
         do i = 1, size(Self%FreeD), 1
             ! element interaction
             InLogical = any(Self%ConnectivityD.eq.Self%FreeD(i),2)
@@ -847,8 +816,9 @@ module FEA_Module
             j = size(InPosition)
             Node_Interaction(i,1:j) = InPosition
         end do
-        !$OMP END PARALLEL DO
+        !$omp end parallel do 
 
+        ! this print the interaction of the Free DoF with the others
         !call FilePrinting(Elem_Interaction,'DataResults/.InternalData/Elem_Interaction.txt')
         !call FilePrinting(Node_Interaction,'DataResults/.InternalData/Node_Interaction.txt')
 
@@ -859,20 +829,19 @@ module FEA_Module
         allocate(Self%Location_KGlobal(Self%Ne,Self%Npe*Self%DimAnalysis,Self%Npe*Self%DimAnalysis))
         Self%Location_KGlobal = 0
         k = 1
-        do i = 1, size(Self%FreeD), 1
-            do j = 1, count(Node_Interaction(i,:).ne.0), 1
-                Self%index_i_KGlobal(k) = findloc(Self%FreeD,Node_Interaction(i,j),1) ! row
-                Self%index_j_KGlobal(k) = findloc(Self%FreeD,Node_Interaction(i,1),1) ! col
+        do i = 1, size(Self%FreeD), 1                               ! Col
+            do j = 1, count(Node_Interaction(i,:).ne.0), 1          ! Row
+                Self%index_i_KGlobal(k) = findloc(Self%FreeD,Node_Interaction(i,j),1) ! Row-indx
+                Self%index_j_KGlobal(k) = i                                           ! Col-indx
                 do i1 = 1, count(Elem_Interaction(i,:).ne.0), 1
                     IndexRow = findloc(Self%ConnectivityD(Elem_Interaction(i,i1),:),Node_Interaction(i,j),1)
                     IndexCol = findloc(Self%ConnectivityD(Elem_Interaction(i,i1),:),Node_Interaction(i,1),1)
-                    if (IndexCol.eq.0.or.IndexRow.eq.0) cycle
+                    if ((IndexCol.eq.0).or.(IndexRow.eq.0)) cycle
                     Self%Location_KGlobal(Elem_Interaction(i,i1),IndexRow,IndexCol) = k
                 end do
                 k = k+1
             end do
         end do
-
     end subroutine PreAssemblyRoutine
     ! 4. Global Stifness Matrix (global sparse form)
     subroutine GetKGlobalSparse(Self)
@@ -882,9 +851,9 @@ module FEA_Module
         logical, dimension(:), allocatable                          :: InLogical
         n = size(Self%index_i_KGlobal)
         if(allocated(Self%value_KGlobal)) then
-            Self%value_KGlobal = 0.0
+            Self%value_KGlobal = 0.0d0
         else
-            allocate(Self%value_KGlobal(n)); Self%value_KGlobal = 0.0
+            allocate(Self%value_KGlobal(n)); Self%value_KGlobal = 0.0d0
         end if
         do i = 1, Self%Ne, 1
             do j = 1, Self%DimAnalysis*Self%Npe, 1
@@ -896,7 +865,7 @@ module FEA_Module
             end do
         end do
         ! eliminating null or zero elements (StiffnessMatrix=0.0)
-        InLogical = Self%value_KGlobal.ne.0.0
+        InLogical = Self%value_KGlobal.ne.0.0d0
         Self%Rows_KGlobal = pack(Self%index_i_KGlobal,InLogical)
         Self%Cols_KGlobal = pack(Self%index_j_KGlobal,InLogical)
         Self%value_KGlobal = pack(Self%value_KGlobal,InLogical)
@@ -910,9 +879,8 @@ module FEA_Module
         class(Structure), intent(inout)                             :: Self
         ! Assembly
         allocate(Self%value_FGlobal(size(Self%FreeD)))
-        Self%value_FGlobal = 0.0
-        Self%value_FGlobal = Self%FGlobal_PL(Self%FreeD) &
-                           + Self%FGlobal_DL(Self%FreeD) 
+        Self%value_FGlobal = 0.0d0
+        Self%value_FGlobal = Self%FGlobal_PL(Self%FreeD) + Self%FGlobal_DL(Self%FreeD) 
     end subroutine GetFGlobalSparse
     ! 5. Updating Data Structure
     subroutine UploadStructure(Self,DensityVector,PenalFactor)
@@ -952,39 +920,36 @@ module FEA_Module
         double precision                                            :: energy
         double precision, dimension(:), allocatable                 :: Strain, Stress
         double precision, dimension(:,:), allocatable               :: D
-        logical                                                     :: T1,T2,T3,T4,T5,T6,T7
+        logical                                                     :: T1,T2,T3,T4
         call ElasticityTensor(Self,D)
         ! allocating
         T1 = allocated(Self%Displacement)
         T2 = allocated(Self%StrainE)
-        T3 = allocated(Self%StrainN)
-        T4 = allocated(Self%StressE)
-        T5 = allocated(Self%StressN)
-        T6 = allocated(Self%StrainEnergyE)
-        T7 = allocated(Self%StrainEnergyN)
-        if(T1.and.T2.and.T3.and.T4.and.T5.and.T6.and.T7) then
-            Self%StrainE = 0.0d0; Self%StrainN = 0.0d0
-            Self%StressE = 0.0d0; Self%StressN = 0.0d0
-            Self%StrainEnergyE = 0.0d0; Self%StrainEnergyN = 0.0d0
+        T3 = allocated(Self%StressE)
+        T4 = allocated(Self%StrainEnergyE)
+        if(T1.and.T2.and.T3.and.T4) then
+            Self%StrainE = 0.0d0
+            Self%StressE = 0.0d0
+            Self%StrainEnergyE = 0.0d0
         else
             allocate(Self%Displacement(Self%N,Self%DimAnalysis))
             if (Self%DimAnalysis.eq.2) then
                 allocate(Strain(3),Stress(3))
                 Strain = 0.0d0; Stress = 0.0d0;
-                allocate(Self%StrainE(Self%Ne,3),Self%StrainN(Self%N,3))        
-                Self%StrainE = 0.0d0; Self%StrainN = 0.0d0
-                allocate(Self%StressE(Self%Ne,3),Self%StressN(Self%N,3))
-                Self%StressE = 0.0d0; Self%StressN = 0.0d0
+                allocate(Self%StrainE(Self%Ne,3))
+                Self%StrainE = 0.0d0
+                allocate(Self%StressE(Self%Ne,3))
+                Self%StressE = 0.0d0
             elseif (Self%DimAnalysis.eq.3) then
-                allocate(Strain(6),Stress(6))                                            
+                allocate(Strain(6),Stress(6))
                 Strain = 0.0d0; Stress = 0.0d0
-                allocate(Self%StrainE(Self%Ne,6),Self%StrainN(Self%N,6))
-                Self%StrainE = 0.0d0; Self%StrainN = 0.0d0
-                allocate(Self%StressE(Self%Ne,6),Self%StressN(Self%N,6))
-                Self%StressE = 0.0d0; Self%StressN = 0.0d0
+                allocate(Self%StrainE(Self%Ne,6))
+                Self%StrainE = 0.0d0
+                allocate(Self%StressE(Self%Ne,6))
+                Self%StressE = 0.0d0
             end if
-            allocate(Self%StrainEnergyE(Self%Ne),Self%StrainEnergyN(Self%N)); 
-            Self%StrainEnergyE = 0.0d0; Self%StrainEnergyN = 0.0d0
+            allocate(Self%StrainEnergyE(Self%Ne)) 
+            Self%StrainEnergyE = 0.0d0
         end if
         ! star processing
         ! Displacement
@@ -1003,26 +968,9 @@ module FEA_Module
             energy = (0.5d0)*dot_product(Self%StrainE(i,:),Self%StressE(i,:)) 
             Self%StrainEnergyE(i) = energy
         end do
-        ! (node-weighted calculation)
-        do i = 1, Self%N, 1
-            ! locating the nodes 
-            index = pack([(j,j=1,Self%Ne)],any(Self%ConnectivityN.eq.i,2))
-            ! 1. Strain
-            Strain = sum(Self%StrainE(index,:),1)
-            Self%StrainN(i,:) = Strain/size(index)
-            ! 2. Stress
-            Stress = sum(Self%StressE(index,:),1)
-            Self%StressN(i,:) = Stress/size(index)
-            ! 3. Energy
-            Energy = sum(Self%StrainEnergyE(index))
-            Self%StrainEnergyN(i) = Energy/size(index)
-        end do
-        call FilePrinting(Self%Displacement,'DataResults/Displacement.txt')
-        call FilePrinting(Self%StrainEnergyE,'V','DataResults/StrainEnergyE.txt')
-        call FilePrinting(Self%StrainEnergyN,'V','DataResults/StrainEnergyN.txt')
-        call FilePrinting(Self%StrainE,'DataResults/StrainE.txt')
-        call FilePrinting(Self%StrainN,'DataResults/StrainN.txt')
-        call FilePrinting(Self%StressE,'DataResults/StressE.txt')
-        call FilePrinting(Self%StressN,'DataResults/StressN.txt')
+        !call FilePrinting(Self%Displacement,'DataResults/Displacement.txt')
+        !call FilePrinting(Self%StrainEnergyE,'V','DataResults/StrainEnergyE.txt')
+        !call FilePrinting(Self%StrainE,'DataResults/StrainE.txt')
+        !call FilePrinting(Self%StressE,'DataResults/StressE.txt')
     end subroutine ProcessingResults
 end module FEA_Module
