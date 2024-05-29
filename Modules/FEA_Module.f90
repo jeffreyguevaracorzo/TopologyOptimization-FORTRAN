@@ -2,7 +2,6 @@ module FEA_Module
     use Base_Module
     use Solver_MA87Module
     implicit none
-    ! Type variable for all the information of the structure
     type Structure
         character(len=20)                               :: AnalysisType     ! PlaneStress(2D), PlainStrain(2D), SolidIso(3D)
         character(len=20)                               :: ElementType      ! tri3 tri6, cuad4, cuad8, tetra4, tetra10, hexa8, hexa20
@@ -62,7 +61,6 @@ module FEA_Module
         procedure                                       :: SolveSystemMA87
         procedure                                       :: ProcessingResults
     end type Structure
-
     contains
     ! --------------- ADDITIONAL BASE FUNCTIONS AND SUBROUTINES ---------------
     ! 1. Reading files routines
@@ -401,14 +399,14 @@ module FEA_Module
     ! ------------ FINITE ELEMENT ANALYSISS FUNCTIONS AND SUBROUTINES ------------
     ! 1. Derivative of the shape functions
     subroutine DiffFormFunction(Self,DiffFunction,e,n,z)
-        ! dN1/de     dN2/de     dN3/de      ....     dNn/de
-        ! dN1/dn     dN2/dn     dN3/dn      ....     dNn/dn
-        ! dN1/dz     dN2/dz     dN3/dz      ....     dNn/dz (3D)
         implicit none
         class(Structure), intent(inout)                             :: Self
         double precision, intent(inout)                             :: e, n
         double precision, intent(inout), optional                   :: z
         double precision, dimension(:,:), allocatable, intent(out)  :: DiffFunction
+        ! dN1/de     dN2/de     dN3/de      ....     dNn/de
+        ! dN1/dn     dN2/dn     dN3/dn      ....     dNn/dn
+        ! dN1/dz     dN2/dz     dN3/dz      ....     dNn/dz (3D)
         if (Self%ElementType.eq.'tria3') then
             allocate(DiffFunction(2,3))
             !  line 1
@@ -676,8 +674,6 @@ module FEA_Module
                 Self%BLocal = 0.0d0
             end if
             allocate(Be(3,2*Self%Npe));                                    Be = 0.0d0;
-            allocate(Jacobian(2,2));                                 Jacobian = 0.0d0;
-            allocate(InvJacobian(2,2));                           InvJacobian = 0.0d0;
             allocate(ElementCoordinates(Self%Npe,2));      ElementCoordinates = 0.0d0;
             do el = 1, Self%Ne, 1
                 ! SIMP PenalFactorization
@@ -698,7 +694,7 @@ module FEA_Module
                         Fac = DetJacobian*w1*w2*(Self%Thickness)
                         ! Be
                         Be = 0.0d0
-                        do k = 1, size(DiffN,2), 1
+                        do k = 1, Self%Npe, 1
                             Be(1,2*k-1) = DiffNxy(1,k)
                             Be(2,2*k) = DiffNxy(2,k)
                             Be(3,2*k-1) = DiffNxy(2,k)
@@ -725,8 +721,6 @@ module FEA_Module
                 Self%BLocal = 0.0d0
             end if
             allocate(Be(6,3*Self%Npe));                                    Be = 0.0d0;
-            allocate(Jacobian(3,3));                                 Jacobian = 0.0d0;
-            allocate(InvJacobian(3,3));                           InvJacobian = 0.0d0;
             allocate(ElementCoordinates(Self%Npe,3));      ElementCoordinates = 0.0d0;
             do el = 1, Self%Ne, 1
                 ! SIMP PenalFactorization
@@ -749,7 +743,7 @@ module FEA_Module
                             DiffNXY = matmul(InvJacobian,DiffN)
                             Fac = DetJacobian*w1*w2*w3
                             ! Be
-                            do l = 1, size(DiffN,2), 1
+                            do l = 1, Self%Npe, 1
                                 Be(1,3*l-2) = DiffNxy(1,l)
                                 Be(2,3*l-1) = DiffNxy(2,l)
                                 Be(3,3*l) = DiffNxy(3,l)
@@ -903,11 +897,10 @@ module FEA_Module
         else
             allocate(Self%UGlobal(Self%n*Self%DimAnalysis));          Self%UGlobal = 0.0d0;
         end if
-        ! Apply HSL-MA87 Solver
+        ! Applying HSL-MA87 Solver
         Self%value_UGlobal = SparseSystemSolver(Self%Rows_KGlobal,Self%Cols_KGlobal,Self%value_KGlobal,Self%value_FGlobal)
         ! Linking Solution
         Self%UGlobal(Self%FreeD) = Self%value_UGlobal
-        ! mechanical variables
         deallocate(Self%value_FGlobal,Self%value_UGlobal,Self%value_KGlobal)
     end subroutine SolveSystemMA87
     ! 7. Processing Results

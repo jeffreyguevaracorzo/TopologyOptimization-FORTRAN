@@ -2,9 +2,6 @@ module Optimization_module
     use MMA_Module
     use FEA_Module
     implicit none
-    ! ----------------------------------------------------------------- !
-    !  Extended type variable for all the information of the structure  !
-    ! ----------------------------------------------------------------- !
     type, extends(Structure)                                    :: Optimization
         ! control variables
         integer                                                 :: Iteration
