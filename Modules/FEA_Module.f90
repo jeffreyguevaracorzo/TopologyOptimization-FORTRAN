@@ -660,9 +660,6 @@ module FEA_Module
         double precision                                            :: e,n,z,w1,w2,w3,DetJacobian,Fac
         double precision, dimension(:,:), allocatable               :: Be,Jacobian,InvJacobian,D
         double precision, dimension(:,:), allocatable               :: DiffN,DiffNXY,ElementCoordinates
-        ! ---- 1st part ----
-        ! in this section the local stiffness matrix (dense) of each of the elements is calculated using gauss 
-        ! quadrature and each of them is stored in the array KLocal[element,[K_x,K_y]].
         if (Self%DimAnalysis.eq.2) then
             if (allocated(Self%KLocal).and.allocated(Self%BLocal)) then
                 Self%KLocal = 0.0d0
@@ -675,6 +672,7 @@ module FEA_Module
             end if
             allocate(Be(3,2*Self%Npe));                                    Be = 0.0d0;
             allocate(ElementCoordinates(Self%Npe,2));      ElementCoordinates = 0.0d0;
+            !$omp parallel do default(none) shared(Self,el) private(D, ElementCoordinates, i, j, e, w1, n, w2, DiffN, Jacobian, InvJacobian, DetJacobian, DiffNXY, Be, FAC)
             do el = 1, Self%Ne, 1
                 ! SIMP PenalFactorization
                 call ElasticityTensor(Self,D)
@@ -693,7 +691,6 @@ module FEA_Module
                         DiffNXY = matmul(InvJacobian,DiffN)
                         Fac = DetJacobian*w1*w2*(Self%Thickness)
                         ! Be
-                        Be = 0.0d0
                         do k = 1, Self%Npe, 1
                             Be(1,2*k-1) = DiffNxy(1,k)
                             Be(2,2*k) = DiffNxy(2,k)
@@ -710,6 +707,7 @@ module FEA_Module
                 end do
                 deallocate(D)
             end do
+            !$omp end parallel do
         elseif(Self%DimAnalysis.eq.3) then
             if (allocated(Self%KLocal).and.allocated(Self%BLocal)) then
                 Self%KLocal = 0.0d0
@@ -722,6 +720,7 @@ module FEA_Module
             end if
             allocate(Be(6,3*Self%Npe));                                    Be = 0.0d0;
             allocate(ElementCoordinates(Self%Npe,3));      ElementCoordinates = 0.0d0;
+            !$omp parallel do default(none) shared(Self,el) private(D, ElementCoordinates, i, j, k, e, w1, n, w2, z, w3, DiffN, Jacobian, InvJacobian, DetJacobian, DiffNXY, Be, FAC)
             do el = 1, Self%Ne, 1
                 ! SIMP PenalFactorization
                 call ElasticityTensor(Self,D)
@@ -764,6 +763,7 @@ module FEA_Module
                 end do
                 deallocate(D)
             end do
+            !$omp end parallel do
         end if
         deallocate(Be,Jacobian,InvJacobian,DiffNXY,ElementCoordinates)
     end subroutine GetKlocal
@@ -771,7 +771,7 @@ module FEA_Module
     subroutine PreAssemblyRoutine(self)
         implicit none
         class(Structure), intent(inout)                             :: Self
-        integer                                                     :: i,j,k,i1,IndexRow,IndexCol
+        integer                                                     :: i,j,k,k_local,i1,IndexRow,IndexCol
         integer, dimension(:), allocatable                          :: InPosition
         logical, dimension(:), allocatable                          :: InLogical
         integer, dimension(:,:), allocatable                        :: Node_Interaction,Elem_Interaction
@@ -823,19 +823,25 @@ module FEA_Module
         allocate(Self%Location_KGlobal(Self%Ne,Self%Npe*Self%DimAnalysis,Self%Npe*Self%DimAnalysis))
         Self%Location_KGlobal = 0
         k = 1
+        !$omp parallel default(none) shared(Self, Node_Interaction, Elem_Interaction, k) private(i, j, i1, IndexRow, IndexCol) 
         do i = 1, size(Self%FreeD), 1                               ! Col
             do j = 1, count(Node_Interaction(i,:).ne.0), 1          ! Row
-                Self%index_i_KGlobal(k) = findloc(Self%FreeD,Node_Interaction(i,j),1) ! Row-indx
-                Self%index_j_KGlobal(k) = i                                           ! Col-indx
+                !$omp critical
+                k_local = k
+                k = k + 1
+                !$omp end critical
+                Self%index_i_KGlobal(k_local) = findloc(Self%FreeD,Node_Interaction(i,j),1) ! Row-indx
+                Self%index_j_KGlobal(k_local) = i                                           ! Col-indx
                 do i1 = 1, count(Elem_Interaction(i,:).ne.0), 1
                     IndexRow = findloc(Self%ConnectivityD(Elem_Interaction(i,i1),:),Node_Interaction(i,j),1)
                     IndexCol = findloc(Self%ConnectivityD(Elem_Interaction(i,i1),:),Node_Interaction(i,1),1)
                     if ((IndexCol.eq.0).or.(IndexRow.eq.0)) cycle
-                    Self%Location_KGlobal(Elem_Interaction(i,i1),IndexRow,IndexCol) = k
+                    Self%Location_KGlobal(Elem_Interaction(i,i1),IndexRow,IndexCol) = k_local
                 end do
-                k = k+1
+                !k = k + 1
             end do
         end do
+        !$omp end parallel
     end subroutine PreAssemblyRoutine
     ! 4. Global Stifness Matrix (global sparse form)
     subroutine GetKGlobalSparse(Self)
@@ -849,6 +855,7 @@ module FEA_Module
         else
             allocate(Self%value_KGlobal(n)); Self%value_KGlobal = 0.0d0
         end if
+        !$omp parallel do default(none) shared(Self, i) private(j, k, n)
         do i = 1, Self%Ne, 1
             do j = 1, Self%DimAnalysis*Self%Npe, 1
                 do k = 1, Self%DimAnalysis*Self%Npe, 1
@@ -858,6 +865,8 @@ module FEA_Module
                 end do
             end do
         end do
+        !$omp end parallel do
+
         ! eliminating null or zero elements (StiffnessMatrix=0.0)
         InLogical = Self%value_KGlobal.ne.0.0d0
         Self%Rows_KGlobal = pack(Self%index_i_KGlobal,InLogical)

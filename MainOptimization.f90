@@ -31,8 +31,8 @@ program MainOptimization
     call SetVolFraction(OptimizationModel,0.5d0)                     ! Limiting volume fraction (lower limit of TOP)
     call SetMutationRate(OptimizationModel,0.2d0)                    ! Rate of change/mutation of optimization
     call SetFilterRadius(OptimizationModel,10.0d0*1.5)               ! Smoothing filter radius (1.5 times de FE size)
-    call SetMaxIterations(OptimizationModel,50)                     ! Maximum number of iterations
-    call SetPenalFactor(OptimizationModel,5.0d0)                     ! SIMP method penalty factor
+    call SetMaxIterations(OptimizationModel,30)                     ! Maximum number of iterations
+    call SetPenalFactor(OptimizationModel,3.0d0)                     ! SIMP method penalty factor
     ! 3. Lectura de archivos .txt 
     write(unit=*, fmt=*) '2. Reading .txt files'
     call ReadFiles(OptimizationModel)

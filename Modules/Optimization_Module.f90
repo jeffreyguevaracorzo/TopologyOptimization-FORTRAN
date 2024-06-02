@@ -52,7 +52,6 @@ module Optimization_module
         procedure                                               :: UploadOptimizationParameters
         procedure                                               :: TopologyOptimizationProcess
     end type 
-
     contains
     ! ----------------------------------------------------------------- !
     !       subroutines to define the information required for TOP      !
@@ -288,7 +287,9 @@ module Optimization_module
         do i = 1, Self%Ne, 1
             PosPromE(i,:) = Sum(Self%Coordinates(Self%ConnectivityN(i,:),:),1)/Self%Npe
         end do
-        ! Star Filtering
+        
+        !$omp parallel default(none) shared(Self, PosPromE, DiffCompilanceNew, DiffVolumeNew) private(i, j, suma, RadPromE, Radius, fac)
+        !$omp for
         do i = 1, Self%Ne, 1
             suma = 0.0d0
             do j = 1, Self%DimAnalysis, 1
@@ -304,6 +305,8 @@ module Optimization_module
             DiffCompilanceNew(i) = DiffCompilanceNew(i)/(Self%DensityVector(i)*suma)
             DiffVolumeNew(i) = DiffVolumeNew(i)/(Self%DensityVector(i)*suma)
         end do
+        !$omp end for
+        !$omp end parallel
         Self%DiffCompilance = DiffCompilanceNew
         Self%DiffVolume = DiffVolumeNew/(Self%DensityVector*Self%VolumePerElement)
         deallocate(DiffCompilanceNew,DiffVolumeNew,Radius,RadPromE)
