@@ -24,7 +24,7 @@ program MainOptimization
     call SetAnalysisType(OptimizationModel,'SolidIso')               ! Set PlaneStress(2D), PlainStrain(2D), SolidIso(3D)
     call SetElementType(OptimizationModel,'hexa8')                   ! tria3 tria6, quad4, quad8, tetra4, tetra10, hexa8, hexa20
     call SetThickness(OptimizationModel,0.0d0)                       ! Only for 2D analysis
-    call SetYoungModulus(OptimizationModel,210000.0d0)                 ! Young modulus
+    call SetYoungModulus(OptimizationModel,420000.0d0)                 ! Young modulus
     call SetPoissonModulus(OptimizationModel,0.3d0)                  ! Poisson modulus
     call SetGaussAprox(OptimizationModel,3)                          ! Can use up to 5 gauss points
     ! 2.2. Optimization parameters
