@@ -1,8 +1,8 @@
 # Makefile compilation parameters
 CC = gfortran
-CFLAGS = -O1 -fbounds-check -fbacktrace -fcheck=all -g -Wall -Wextra -Wrealloc-lhs-all
+CFLAGS = -O3 -fbounds-check -fbacktrace -fcheck=all -g -Wall -Wextra -Wrealloc-lhs-all
 TARGET = ExecuteOptimization
-EXT = -llapack -lblas -L/opt/homebrew/Cellar/metis/5.1.0/lib -lmetis -fopenmp
+EXT = -llapack -lblas -L/opt/homebrew/Cellar/metis/5.1.0/lib -lmetis -L/opt/homebrew/Cellar/libomp/18.1.6/lib -fopenmp
 FILES = Modules/MA87Routines/sdeps90.f90 \
 		Modules/MA87Routines/ddeps90.f90 \
 		Modules/MA87Routines/common90.f90 \

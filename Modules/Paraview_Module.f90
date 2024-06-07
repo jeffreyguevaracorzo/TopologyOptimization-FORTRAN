@@ -244,17 +244,17 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '.esca'
+                Path1 = ResultName // '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -266,17 +266,17 @@ module Paraview_Module
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '.esca'
+                Path1 = ResultName // '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -304,17 +304,17 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '.esca'
+                Path1 = ResultName // '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -326,17 +326,17 @@ module Paraview_Module
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '.esca'
+                Path1 = ResultName // '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -364,21 +364,21 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '_X' //  '.esca'
+                Path1 = ResultName // '_X' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_X' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Y' //  '.esca'
+                Path1 = ResultName // '_Y' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Y' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Eq' //  '.esca'
+                Path1 = ResultName // '_Eq' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Eq' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -396,23 +396,23 @@ module Paraview_Module
             call GenerateEscalarParaviewFileReal(Path1,'coordinates',Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '_X' //  '.esca'
+                Path1 = ResultName // '_X' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_X' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Y' //  '.esca'
+                Path1 = ResultName // '_Y' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Y' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Z' //  '.esca'
+                Path1 = ResultName // '_Z' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Z' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Eq' //  '.esca'
+                Path1 = ResultName // '_Eq' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Eq' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -449,21 +449,21 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '_X' //  '.esca'
+                Path1 = ResultName // '_X' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_X' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Y' //  '.esca'
+                Path1 = ResultName // '_Y' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Y' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Eq' //  '.esca'
+                Path1 = ResultName // '_Eq' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Eq' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -481,23 +481,23 @@ module Paraview_Module
             call GenerateEscalarParaviewFileDP(Path1,'coordinates',Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // '_X' //  '.esca'
+                Path1 = ResultName // '_X' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_X' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Y' //  '.esca'
+                Path1 = ResultName // '_Y' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Y' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Z' //  '.esca'
+                Path1 = ResultName // '_Z' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Z' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // '_Eq' //  '.esca'
+                Path1 = ResultName // '_Eq' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per node:   ' // ResultName // '_Eq' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -534,24 +534,24 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -574,30 +574,30 @@ module Paraview_Module
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_zz' //  '.esca'
+                Path1 = ResultName // 'E_zz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yz' //  '.esca'
+                Path1 = ResultName // 'E_yz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xz' //  '.esca'
+                Path1 = ResultName // 'E_xz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -646,24 +646,24 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -686,30 +686,30 @@ module Paraview_Module
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_zz' //  '.esca'
+                Path1 = ResultName // 'E_zz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yz' //  '.esca'
+                Path1 = ResultName // 'E_yz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xz' //  '.esca'
+                Path1 = ResultName // 'E_xz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -758,24 +758,24 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -798,30 +798,30 @@ module Paraview_Module
             call GenerateEscalarParaviewFileReal(Path1,Element,Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_zz' //  '.esca'
+                Path1 = ResultName // 'E_zz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yz' //  '.esca'
+                Path1 = ResultName // 'E_yz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xz' //  '.esca'
+                Path1 = ResultName // 'E_xz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -869,24 +869,24 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -909,30 +909,30 @@ module Paraview_Module
             call GenerateEscalarParaviewFileDP(Path1,Element,Result)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
                 ! per element
-                Path1 = Path // '/' // ResultName // 'E_xx' //  '.esca'
+                Path1 = ResultName // 'E_xx' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xx' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yy' //  '.esca'
+                Path1 = ResultName // 'E_yy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_zz' //  '.esca'
+                Path1 = ResultName // 'E_zz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_zz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xy' //  '.esca'
+                Path1 = ResultName // 'E_xy' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xy' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_yz' //  '.esca'
+                Path1 = ResultName // 'E_yz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_yz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_xz' //  '.esca'
+                Path1 = ResultName // 'E_xz' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_xz' // ' ' // Path1
-                Path1 = Path // '/' // ResultName // 'E_VonMises' //  '.esca'
+                Path1 = ResultName // 'E_VonMises' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E_VonMises' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -979,17 +979,17 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'E' //  '.esca'
+                Path1 = ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -1000,17 +1000,17 @@ module Paraview_Module
             call GenerateEscalarParaviewFileReal(Path1,Element,StrainEnergyE)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'E' //  '.esca'
+                Path1 = ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -1036,17 +1036,17 @@ module Paraview_Module
         integer                                                    :: i,ios,iounit
         if (size(Coord,2).eq.2) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'E' //  '.esca'
+                Path1 = ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
             ! Geometry File
@@ -1057,17 +1057,17 @@ module Paraview_Module
             call GenerateEscalarParaviewFileDP(Path1,Element,StrainEnergyE)
         elseif (size(Coord,2).eq.3) then
             ! case file (principal file)
-            CaseName = ResultName //'.case'
+            CaseName =  Path // '/' // ResultName //'.case'
             open(unit=iounit, file=CaseName, iostat=ios, status="replace", action="write")
                 if ( ios /= 0 ) stop "Error opening file name_casefile"
                 write(unit=iounit,fmt='(a)') 'FORMAT'
                 write(unit=iounit,fmt='(a)') 'type: ensight gold'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'GEOMETRY'
-                write(unit=iounit,fmt='(a)') 'model:     ' // Path // '/' // ResultName //'.geom'
+                write(unit=iounit,fmt='(a)') 'model:     ' // ResultName //'.geom'
                 write(unit=iounit,fmt='(a)') ''
                 write(unit=iounit,fmt='(a)') 'VARIABLE'
-                Path1 = Path // '/' // ResultName // 'E' //  '.esca'
+                Path1 = ResultName // 'E' //  '.esca'
                 write(unit=iounit,fmt='(a)') 'scalar per element:   ' // ResultName // 'E' // ' ' // Path1
             close(iounit)
             ! Geometry File

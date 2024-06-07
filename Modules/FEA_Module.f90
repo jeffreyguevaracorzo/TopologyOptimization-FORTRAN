@@ -853,7 +853,8 @@ module FEA_Module
         if(allocated(Self%value_KGlobal)) then
             Self%value_KGlobal = 0.0d0
         else
-            allocate(Self%value_KGlobal(n)); Self%value_KGlobal = 0.0d0
+            allocate(Self%value_KGlobal(n))
+            Self%value_KGlobal = 0.0d0
         end if
         !$omp parallel do default(none) shared(Self, i) private(j, k, n)
         do i = 1, Self%Ne, 1
@@ -917,62 +918,140 @@ module FEA_Module
         implicit none
         class(Structure), intent(inout)                             :: Self
         ! internal variables
-        integer                                                     :: i,j
-        integer, dimension(:), allocatable                          :: index
-        double precision                                            :: energy
-        double precision, dimension(:), allocatable                 :: Strain, Stress
-        double precision, dimension(:,:), allocatable               :: D
+        integer                                                     :: el,i,j,k,l,m,ios
+        double precision                                            :: e,n,z,w1,w2,w3,DetJacobian,Fac
+        double precision                                            :: DensEnergy
+        double precision, dimension(:), allocatable                 :: Strain,Stress,ElementDisplacement
+        double precision, dimension(:,:), allocatable               :: Be,Jacobian,InvJacobian,D,DiffN,DiffNXY
+        double precision, dimension(:,:), allocatable               :: ElementCoordinates
         logical                                                     :: T1,T2,T3,T4
-        call ElasticityTensor(Self,D)
-        ! allocating
         T1 = allocated(Self%Displacement)
         T2 = allocated(Self%StrainE)
         T3 = allocated(Self%StressE)
         T4 = allocated(Self%StrainEnergyE)
-        if(T1.and.T2.and.T3.and.T4) then
-            Self%StrainE = 0.0d0
-            Self%StressE = 0.0d0
-            Self%StrainEnergyE = 0.0d0
+        if (Self%DimAnalysis.eq.2) then
+            allocate(Be(3,2*Self%Npe));                                        Be = 0.0d0
+            allocate(ElementCoordinates(Self%Npe,2));          ElementCoordinates = 0.0d0
+            allocate(ElementDisplacement(Self%Npe*2));        ElementDisplacement = 0.0d0
+            ! Results
+            if(T1.and.T2.and.T3.and.T4) then
+                Self%StrainE = 0.0d0
+                Self%StressE = 0.0d0
+                Self%StrainEnergyE = 0.0d0
+            else
+                allocate(Self%StrainE(Self%Ne,3));                   Self%StrainE = 0.0d0
+                allocate(Self%StressE(Self%Ne,3));                   Self%StressE = 0.0d0
+                allocate(Self%StrainEnergyE(Self%Ne));         Self%StrainEnergyE = 0.0d0
+            end if 
+            call ElasticityTensor(Self,D)
+            do el = 1, Self%Ne, 1
+                ElementCoordinates = Self%Coordinates(Self%ConnectivityN(el,:),1:2)
+                ElementDisplacement = Self%UGlobal(Self%ConnectivityD(el,:))
+                do i = 1, Self%QuadGauss, 1
+                    e = Self%GaussPoint(i)
+                    w1 = Self%GaussWeights(i)
+                    do j = 1, Self%QuadGauss, 1
+                        n = Self%GaussPoint(j)
+                        w2 = Self%GaussWeights(j)
+                        call DiffFormFunction(Self,DiffN,e,n)
+                        Jacobian = matmul(DiffN,ElementCoordinates)
+                        InvJacobian = Inverse(Jacobian)
+                        DetJacobian = abs(Determinant(Jacobian))
+                        DiffNXY = matmul(InvJacobian,DiffN)
+                        Fac = DetJacobian*w1*w2*(Self%Thickness)
+                        ! Be
+                        do k = 1, size(DiffN,2), 1
+                            Be(1,2*k-1) = DiffNxy(1,k)
+                            Be(2,2*k) = DiffNxy(2,k)
+                            Be(3,2*k-1) = DiffNxy(2,k)
+                            Be(3,2*k) = DiffNxy(1,k)
+                        end do
+                        ! 1. Strain     Strain_e = Be*Ue
+                        ! exx - eyy - ezz(3D) - exy - eyz(3D) - exz(3D)
+                        Strain = Fac*matmul(Be,ElementDisplacement)
+                        Self%StrainE(el,:) = Self%StrainE(el,:) + Strain
+                        ! 2. Stress      Sigma_e = D*Strain_e
+                        ! Sxx - Syy - Szz(3D) - Sxy - Syz(3D) - Sxz(3D)
+                        Stress = Fac*matmul(D,Strain)
+                        Self%StressE(el,:) = Self%StressE(el,:) + Stress
+                        ! 3. Energy    Ee = 0.5*Sigma_e*Strain_e
+                        DensEnergy = (0.5d0)*(dot_product(Strain,Stress))
+                        Self%StrainEnergyE(el) = Self%StrainEnergyE(el) + DensEnergy
+                        deallocate(DiffN)
+                    end do
+                end do
+            end do
+        elseif(Self%DimAnalysis.eq.3) then
+            allocate(Be(6,3*Self%Npe));                                        Be = 0.0d0
+            allocate(ElementCoordinates(Self%Npe,3));          ElementCoordinates = 0.0d0
+            allocate(ElementDisplacement(Self%Npe*3));        ElementDisplacement = 0.0d0
+            ! Results
+            if(T1.and.T2.and.T3.and.T4) then
+                Self%StrainE = 0.0d0
+                Self%StressE = 0.0d0
+                Self%StrainEnergyE = 0.0d0
+            else
+                allocate(Self%StrainE(Self%Ne,6));                   Self%StrainE = 0.0d0
+                allocate(Self%StressE(Self%Ne,6));                   Self%StressE = 0.0d0
+                allocate(Self%StrainEnergyE(Self%Ne));         Self%StrainEnergyE = 0.0d0
+            end if
+            call ElasticityTensor(Self,D)
+            do el = 1, Self%Ne, 1
+                ElementCoordinates = Self%Coordinates(Self%ConnectivityN(el,:),1:3)
+                ElementDisplacement = Self%UGlobal(Self%ConnectivityD(el,:))
+                do i = 1, Self%QuadGauss, 1
+                    e = Self%GaussPoint(i)
+                    w1 = Self%GaussWeights(i)
+                    do j = 1, Self%QuadGauss, 1
+                        n = Self%GaussPoint(j)
+                        w2 = Self%GaussWeights(j)
+                        do k = 1, Self%QuadGauss, 1
+                            z = Self%GaussPoint(k)
+                            w3 = Self%GaussWeights(k)
+                            call DiffFormFunction(Self,DiffN,e,n,z)
+                            Jacobian = matmul(DiffN,ElementCoordinates)
+                            InvJacobian = Inverse(Jacobian)
+                            DetJacobian = abs(Determinant(Jacobian))
+                            DiffNXY = matmul(InvJacobian,DiffN)
+                            Fac = DetJacobian*w1*w2*w3
+                            ! Be
+                            do l = 1, size(DiffN,2), 1
+                                Be(1,3*l-2) = DiffNxy(1,l)
+                                Be(2,3*l-1) = DiffNxy(2,l)
+                                Be(3,3*l) = DiffNxy(3,l)
+                                Be(4,3*l-2) = DiffNxy(2,l)
+                                Be(4,3*l-1) = DiffNxy(1,l)
+                                Be(5,3*l-1) = DiffNxy(3,l)
+                                Be(5,3*l) = DiffNxy(2,l)
+                                Be(6,3*l-2) = DiffNxy(3,l)
+                                Be(6,3*l) = DiffNxy(1,l)
+                            end do
+                            ! 1. Strain     Strain_e = Be*Ue
+                            ! exx - eyy - ezz(3D) - exy - eyz(3D) - exz(3D)
+                            Strain = Fac*matmul(Be,ElementDisplacement)
+                            Self%StrainE(el,:) = Self%StrainE(el,:) + Strain
+                            ! 2. Stress      Sigma_e = D*Strain_e
+                            ! Sxx - Syy - Szz(3D) - Sxy - Syz(3D) - Sxz(3D)
+                            Stress = matmul(D,Strain)
+                            Self%StressE(el,:) = Self%StressE(el,:) + Stress
+                            ! 3. Energy    Ee = 0.5*Sigma_e*Strain_e
+                            DensEnergy = (0.5d0)*(dot_product(Strain,Stress))
+                            Self%StrainEnergyE(el) = Self%StrainEnergyE(el) + DensEnergy
+                            deallocate(DiffN)
+                        end do
+                    end do
+                end do
+            end do
+        end if
+        if (allocated(Self%Displacement)) then
+            Self%Displacement = Transpose(reshape(Self%UGlobal,[Self%DimAnalysis,Self%N]))
         else
             allocate(Self%Displacement(Self%N,Self%DimAnalysis))
-            if (Self%DimAnalysis.eq.2) then
-                allocate(Strain(3),Stress(3))
-                Strain = 0.0d0; Stress = 0.0d0;
-                allocate(Self%StrainE(Self%Ne,3))
-                Self%StrainE = 0.0d0
-                allocate(Self%StressE(Self%Ne,3))
-                Self%StressE = 0.0d0
-            elseif (Self%DimAnalysis.eq.3) then
-                allocate(Strain(6),Stress(6))
-                Strain = 0.0d0; Stress = 0.0d0
-                allocate(Self%StrainE(Self%Ne,6))
-                Self%StrainE = 0.0d0
-                allocate(Self%StressE(Self%Ne,6))
-                Self%StressE = 0.0d0
-            end if
-            allocate(Self%StrainEnergyE(Self%Ne)) 
-            Self%StrainEnergyE = 0.0d0
+            Self%Displacement = Transpose(reshape(Self%UGlobal,[Self%DimAnalysis,Self%N]))
         end if
-        ! star processing
-        ! Displacement
-        Self%Displacement = Transpose(reshape(Self%UGlobal,[Self%DimAnalysis,Self%N]))
-        ! (calculation per element)
-        do i = 1, Self%Ne, 1
-            ! 1. Strain     Strain_e = Be*Ue        
-            ! exx - eyy - ezz(3D) - exy - eyz(3D) - exz(3D)
-            Strain = matmul(Self%BLocal(i,:,:),Self%UGlobal(Self%ConnectivityD(i,:)))
-            Self%StrainE(i,:) = Strain
-            ! 2. Stress      Sigma_e = D*Strain_e   
-            ! Sxx - Syy - Szz(3D) - Sxy - Syz(3D) - Sxz(3D)
-            Stress = matmul(D,Strain)
-            Self%StressE(i,:) = Stress
-            ! 3. Energy    Ee = 0.5*Sigma_e*Strain_e
-            energy = (0.5d0)*dot_product(Self%StrainE(i,:),Self%StressE(i,:)) 
-            Self%StrainEnergyE(i) = energy
-        end do
         !call FilePrinting(Self%Displacement,'DataResults/Displacement.txt')
-        !call FilePrinting(Self%StrainEnergyE,'V','DataResults/StrainEnergyE.txt')
         !call FilePrinting(Self%StrainE,'DataResults/StrainE.txt')
         !call FilePrinting(Self%StressE,'DataResults/StressE.txt')
+        !call FilePrinting(Self%StrainEnergyE,'V','DataResults/StrainEnergyE.txt')
     end subroutine ProcessingResults
 end module FEA_Module

@@ -3,14 +3,16 @@ module Optimization_module
     use FEA_Module
     implicit none
     type, extends(Structure)                                    :: Optimization
-        ! control variables
+        character(len=3)                                        :: OptAlgorithm
         integer                                                 :: Iteration
-        integer                                                 :: MaxIterations
+        integer                                                 :: MaxTOIteration
+        double precision                                        :: MinDensityValue
         double precision                                        :: PostProcesingFilter
         double precision                                        :: FilterRadius
         double precision                                        :: PenalFactor
         double precision                                        :: VolFraction
         double precision                                        :: MutationRate
+        double precision                                        :: OptimizationTolerance
         double precision                                        :: Change
         double precision, dimension(:), allocatable             :: DensityVector    
         double precision, dimension(:), allocatable             :: FinalDensityVector
@@ -43,6 +45,7 @@ module Optimization_module
         integer, dimension(:), allocatable                      :: FinalGeometry
     contains
         procedure                                               :: MMAParameters
+        procedure                                               :: SetMinDensityValue
         procedure                                               :: SetMaxIterations
         procedure                                               :: SetPostProcesingFilter
         procedure                                               :: SetFilterRadius
@@ -90,49 +93,70 @@ module Optimization_module
         Self%d = 0.0
     end subroutine MMAParameters
     ! topology optimization subroutines
-    ! 1. Input max iterations
-    subroutine SetMaxIterations(Self,MaxIterations)
+    ! 2. Optimization algoritm
+    subroutine SetOptimizationAlgorithm(Self,OptAlgorithm)
         implicit none
         class(Optimization), intent(inout)                           :: Self
-        integer, intent(in)                                          :: MaxIterations
-        Self%MaxIterations = MaxIterations
+        character(len=3)                                             :: OptAlgorithm
+        Self%OptAlgorithm = OptAlgorithm
+    end subroutine SetOptimizationAlgorithm
+    ! 3. Minimun Density Value
+    subroutine SetMinDensityValue(Self,MinDensityValue)
+        implicit none
+        class(Optimization), intent(inout)                           :: Self
+        double precision, intent(in)                                 :: MinDensityValue
+        Self%MinDensityValue = MinDensityValue
+    end subroutine SetMinDensityValue
+    ! 4. Input max iterations
+    subroutine SetMaxIterations(Self,MaxTOIteration)
+        implicit none
+        class(Optimization), intent(inout)                           :: Self
+        integer, intent(in)                                          :: MaxTOIteration
+        Self%MaxTOIteration = MaxTOIteration
     end subroutine SetMaxIterations
-    ! 2. Input Post-processing filter
+    ! 5. Input Post-processing filter
     subroutine SetPostProcesingFilter(Self,PostProcesingFilter)
         implicit none
         class(Optimization), intent(inout)                           :: Self
         double precision, intent(in)                                 :: PostProcesingFilter
         Self%PostProcesingFilter = PostProcesingFilter
     end subroutine SetPostProcesingFilter
-    ! 2. Input filter radius
+    ! 6. Input filter radius
     subroutine SetFilterRadius(Self,FilterRadius)
         implicit none
         class(Optimization), intent(inout)                           :: Self
         double precision, intent(in)                                 :: FilterRadius
         Self%FilterRadius = FilterRadius
     end subroutine SetFilterRadius
-    ! 3. Input penal factor
+    ! 7. Input penal factor
     subroutine SetPenalFactor(Self,PenalFactor)
         implicit none
         class(Optimization), intent(inout)                           :: Self
         double precision, intent(in)                                 :: PenalFactor
         Self%PenalFactor = PenalFactor
     end subroutine SetPenalFactor
-    ! 4. Input max volumne fraction
+    ! 8. Input max volumne fraction
     subroutine SetVolFraction(Self,VolFraction)
         implicit none
         double precision, intent(in)                                 :: VolFraction
         class(Optimization), intent(inout)                           :: Self
         Self%VolFraction = VolFraction
     end subroutine SetVolFraction
-    ! 5. Input mutation/changing rate
+    ! 9. Input mutation/changing rate
     subroutine SetMutationRate(Self,Mutation)
         implicit none
         class(Optimization), intent(inout)                           :: Self
         double precision, intent(in)                                 :: Mutation
         Self%MutationRate = Mutation
     end subroutine SetMutationRate
-    ! 6. Updating Optimization parameters
+    ! 10. Input optimization tolerance
+    subroutine SetOptimizationTolerance(Self,OptimizationTolerance)
+        implicit none
+        class(Optimization), intent(inout)                           :: Self
+        double precision, intent(in)                                 :: OptimizationTolerance
+        Self%OptimizationTolerance = OptimizationTolerance
+    end subroutine SetOptimizationTolerance
+    ! 11. Updating Optimization parameters
     subroutine UploadOptimizationParameters(Self)
         implicit none
         class(Optimization), intent(inout)                           :: Self
@@ -156,7 +180,7 @@ module Optimization_module
         ! Assign the MMA Params.
         call MMAParameters(Self)
     end subroutine UploadOptimizationParameters
-    ! 7. Printing TO Convergence
+    ! 12. Printing TO Convergence
     Subroutine PrintingConvergence(Iteration,Self)
         implicit none
         integer, intent(in)                                          :: Iteration
@@ -165,7 +189,7 @@ module Optimization_module
         write(unit=*, fmt=*) 'Ite,', Iteration,'PenalFactor',Self%PenalFactor,'ObjFunction,',Sum(Self%Compilance),'Change', &
                                 Self%Change,'FracVolume,',Sum(Self%VolumePerElement*Self%DensityVector)/Sum(Self%VolumePerElement)
     end subroutine PrintingConvergence
-    ! 8. Volume Calculation
+    ! 13. Volume Calculation
     subroutine VolumeAllElement(Self)
         implicit none
         class(Optimization), intent(inout)                              :: Self
@@ -307,6 +331,7 @@ module Optimization_module
         end do
         !$omp end for
         !$omp end parallel
+        
         Self%DiffCompilance = DiffCompilanceNew
         Self%DiffVolume = DiffVolumeNew/(Self%DensityVector*Self%VolumePerElement)
         deallocate(DiffCompilanceNew,DiffVolumeNew,Radius,RadPromE)
@@ -398,11 +423,11 @@ module Optimization_module
     subroutine TopologyOptimizationProcess(Self)
         implicit none
         class(Optimization), intent(inout)                           :: Self
-        Self%Iteration = 0
         call UploadOptimizationParameters(Self)
-        write(unit=*, fmt=*) '---- topology optimization process ----'
-        do while ((Self%Change.gt.0.001).and.(Self%Iteration.lt.Self%MaxIterations))
-            Self%Iteration = Self%Iteration + 1
+        call PreAssemblyRoutine(Self)
+        Self%Iteration = 1
+        write(unit=*, fmt=*) '---------- topology optimization process ----------'
+        do
             write(unit=*, fmt=*) '-Updating mechanical parameters and solving the system'
             call UploadStructure(Self,Self%DensityVector,Self%PenalFactor)
             call SolveSystemMA87(Self)
@@ -412,11 +437,13 @@ module Optimization_module
             write(unit=*, fmt=*) '-Applying Density Filtering'
             call DensityFilter(Self)
             write(unit=*, fmt=*) '-Getting new solution'
-            ! choose the Opt. Algorhtm
-            call OptimalityCriteria(Self)
-            !call MethodMovingAsympotes(Self)
+            if (Self%OptAlgorithm.eq.'OCM') then; call OptimalityCriteria(Self)    ; end if
+            if (Self%OptAlgorithm.eq.'MMA') then; call MethodMovingAsympotes(Self) ; end if 
             ! Printing Convergence
             call PrintingConvergence(Self%Iteration,Self)
+            if (Self%Change.lt.Self%OptimizationTolerance) then; write(unit=*, fmt=*) 'Precision achieved'        ; exit; end if
+            if (Self%Iteration.ge.Self%MaxTOIteration)     then; write(unit=*, fmt=*) 'Max TO iterations reached' ; exit; end if 
+            Self%Iteration = Self%Iteration + 1
         end do
         call FinalToplogy(Self)
     end subroutine TopologyOptimizationProcess

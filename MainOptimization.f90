@@ -24,23 +24,23 @@ program MainOptimization
     call SetAnalysisType(OptimizationModel,'SolidIso')               ! Set PlaneStress(2D), PlainStrain(2D), SolidIso(3D)
     call SetElementType(OptimizationModel,'hexa8')                   ! tria3 tria6, quad4, quad8, tetra4, tetra10, hexa8, hexa20
     call SetThickness(OptimizationModel,0.0d0)                       ! Only for 2D analysis
-    call SetYoungModulus(OptimizationModel,1000.0d0)                 ! Young modulus
+    call SetYoungModulus(OptimizationModel,210000.0d0)                 ! Young modulus
     call SetPoissonModulus(OptimizationModel,0.3d0)                  ! Poisson modulus
     call SetGaussAprox(OptimizationModel,3)                          ! Can use up to 5 gauss points
     ! 2.2. Optimization parameters
+    call SetOptimizationAlgorithm(OptimizationModel,'OCM')           ! Optimality criteria (OCM), Method of moving Asym. (MMA)
+    call SetMinDensityValue(OptimizationModel,1.0d-2)                ! Min. Density value
     call SetVolFraction(OptimizationModel,0.5d0)                     ! Limiting volume fraction (lower limit of TOP)
     call SetMutationRate(OptimizationModel,0.2d0)                    ! Rate of change/mutation of optimization
     call SetFilterRadius(OptimizationModel,10.0d0*1.5)               ! Smoothing filter radius (1.5 times de FE size)
-    call SetMaxIterations(OptimizationModel,30)                     ! Maximum number of iterations
+    call SetMaxIterations(OptimizationModel,30)                      ! Maximum number of iterations
     call SetPenalFactor(OptimizationModel,3.0d0)                     ! SIMP method penalty factor
-    ! 3. Lectura de archivos .txt 
-    write(unit=*, fmt=*) '2. Reading .txt files'
+    call SetOptimizationTolerance(OptimizationModel,0.01d0)            ! Optimization tolerance
     call ReadFiles(OptimizationModel)
-    write(unit=*, fmt=*) '2.1 Pre Assembly Routine'
-    call PreAssemblyRoutine(OptimizationModel)
-    ! 4. Applying the topology optimization meth.
+    ! 3. Applying the topology optimization
+    write(unit=*, fmt=*) '2. Topology optimization'
     call TopologyOptimizationProcess(OptimizationModel)
-    ! 5. Postprocesado con paraview
+    ! 4. Postprocesado con paraview
     write(unit=*, fmt=*) '3. PostProcessing'
     call SetPostProcesingFilter(OptimizationModel,0.5d0)               ! PostProcessing filter (to eliminate inter. densities)
     ! note: leave whatever you want to postprocess and generate the 
