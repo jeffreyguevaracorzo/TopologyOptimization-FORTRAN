@@ -972,7 +972,7 @@ module FEA_Module
                         Self%StrainE(el,:) = Self%StrainE(el,:) + Strain
                         ! 2. Stress      Sigma_e = D*Strain_e
                         ! Sxx - Syy - Szz(3D) - Sxy - Syz(3D) - Sxz(3D)
-                        Stress = Fac*matmul(D,Strain)
+                        Stress = matmul(D,Strain)
                         Self%StressE(el,:) = Self%StressE(el,:) + Stress
                         ! 3. Energy    Ee = 0.5*Sigma_e*Strain_e
                         DensEnergy = (0.5d0)*(dot_product(Strain,Stress))
