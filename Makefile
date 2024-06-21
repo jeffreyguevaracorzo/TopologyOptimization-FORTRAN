@@ -2,7 +2,7 @@
 CC = gfortran
 CFLAGS = -O3 -fbounds-check -fbacktrace -fcheck=all -g -Wall -Wextra -Wrealloc-lhs-all
 TARGET = ExecuteOptimization
-EXT = -llapack -lblas -L/opt/homebrew/Cellar/metis/5.1.0/lib -lmetis -L/opt/homebrew/Cellar/libomp/18.1.6/lib -fopenmp
+EXT = -llapack -lblas -L/opt/homebrew/Cellar/metis/5.1.0/lib -lmetis -L/opt/homebrew/Cellar/libomp/18.1.7/lib -fopenmp
 FILES = Modules/MA87Routines/sdeps90.f90 \
 		Modules/MA87Routines/ddeps90.f90 \
 		Modules/MA87Routines/common90.f90 \
