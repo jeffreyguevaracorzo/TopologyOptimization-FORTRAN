@@ -89,7 +89,7 @@ module Optimization_module
         Self%upp = 1.0d0
         Self%a0 = 1.0
         Self%a = 0.0
-        Self%c = 10000.0
+        Self%c = 100.0    !100.0d0
         Self%d = 0.0
     end subroutine MMAParameters
     ! topology optimization subroutines
@@ -389,9 +389,9 @@ module Optimization_module
         Self%xMMA(:,1) = Self%DensityVector
         v1 = sum(Self%DensityVector*Self%VolumePerElement)
         v2 = sum(Self%VolumePerElement*Self%VolFraction)
-        Self%fval(1,1) = (v1 - v2)
+        Self%fval(1,1) = (v1 - v2)!/(Self%Ne*Self%VolFraction)
+        Self%dfdx(1,:) = Self%DiffVolume!/(Self%Ne*Self%VolFraction)
         Self%f0val = sum(Self%Compilance)
-        Self%dfdx(1,:) = Self%DiffVolume
         Self%df0dx(:,1) = Self%DiffCompilance
         ! applying the MMA solver interface of Svanberg
         call MMA_Solver_Interface(self%mm,Self%nn,Self%Iteration,Self%XMMA,Self%xmin,Self%xmax,Self%xold1,Self%xold2, &
@@ -401,6 +401,7 @@ module Optimization_module
         Self%xold1(:,1) = Self%DensityVector
         Self%DensityVector = Self%XMMA(:,1)
         Self%Change = maxval(abs(Self%DensityVector-Self%xold1(:,1)))
+        call FilePrinting(Self%DensityVector,'V','DataResults/DensityVector.txt')
     end subroutine MethodMovingAsympotes
     ! 3. Compilance and Diff Compilance
     subroutine GetCompilance(Self)

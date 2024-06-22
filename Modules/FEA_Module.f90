@@ -956,7 +956,7 @@ module FEA_Module
                         call DiffFormFunction(Self,DiffN,e,n)
                         Jacobian = matmul(DiffN,ElementCoordinates)
                         InvJacobian = Inverse(Jacobian)
-                        DetJacobian = abs(Determinant(Jacobian))
+                        DetJacobian = Determinant(Jacobian)
                         DiffNXY = matmul(InvJacobian,DiffN)
                         Fac = DetJacobian*w1*w2*(Self%Thickness)
                         ! Be
@@ -1011,7 +1011,7 @@ module FEA_Module
                             call DiffFormFunction(Self,DiffN,e,n,z)
                             Jacobian = matmul(DiffN,ElementCoordinates)
                             InvJacobian = Inverse(Jacobian)
-                            DetJacobian = abs(Determinant(Jacobian))
+                            DetJacobian = Determinant(Jacobian)
                             DiffNXY = matmul(InvJacobian,DiffN)
                             Fac = DetJacobian*w1*w2*w3
                             ! Be

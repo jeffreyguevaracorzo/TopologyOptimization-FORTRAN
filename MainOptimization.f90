@@ -21,21 +21,21 @@ program MainOptimization
     ! 2. Ingreso de parametros y propiedades de estructura
     write(unit=*, fmt=*) '1. Structure Properties'
     ! 2.1. Mechanical parameters
-    call SetAnalysisType(OptimizationModel,'SolidIso')               ! Set PlaneStress(2D), PlainStrain(2D), SolidIso(3D)
-    call SetElementType(OptimizationModel,'hexa8')                   ! tria3 tria6, quad4, quad8, tetra4, tetra10, hexa8, hexa20
-    call SetThickness(OptimizationModel,0.0d0)                       ! Only for 2D analysis
-    call SetYoungModulus(OptimizationModel,420000.0d0)                 ! Young modulus
+    call SetAnalysisType(OptimizationModel,'PlaneStress')            ! Set PlaneStress(2D), PlainStrain(2D), SolidIso(3D)
+    call SetElementType(OptimizationModel,'quad4')                   ! tria3 tria6, quad4, quad8, tetra4, tetra10, hexa8, hexa20
+    call SetThickness(OptimizationModel,50.0d0)                      ! Only for 2D analysis
+    call SetYoungModulus(OptimizationModel,420000.0d0)               ! Young modulus
     call SetPoissonModulus(OptimizationModel,0.3d0)                  ! Poisson modulus
     call SetGaussAprox(OptimizationModel,3)                          ! Can use up to 5 gauss points
     ! 2.2. Optimization parameters
-    call SetOptimizationAlgorithm(OptimizationModel,'OCM')           ! Optimality criteria (OCM), Method of moving Asym. (MMA)
-    call SetMinDensityValue(OptimizationModel,1.0d-2)                ! Min. Density value
-    call SetVolFraction(OptimizationModel,0.5d0)                     ! Limiting volume fraction (lower limit of TOP)
-    call SetMutationRate(OptimizationModel,0.2d0)                    ! Rate of change/mutation of optimization
+    call SetOptimizationAlgorithm(OptimizationModel,'MMA')           ! Optimality criteria (OCM), Method of moving Asym. (MMA)
+    call SetMinDensityValue(OptimizationModel,1.0d-1)                ! Min. Density value
+    call SetVolFraction(OptimizationModel,0.2d0)                     ! Limiting volume fraction (lower limit of TOP)
+    call SetMutationRate(OptimizationModel,0.1d0)                    ! Rate of change/mutation of optimization
     call SetFilterRadius(OptimizationModel,10.0d0*1.5)               ! Smoothing filter radius (1.5 times de FE size)
-    call SetMaxIterations(OptimizationModel,30)                      ! Maximum number of iterations
+    call SetMaxIterations(OptimizationModel,100)                     ! Maximum number of iterations
     call SetPenalFactor(OptimizationModel,3.0d0)                     ! SIMP method penalty factor
-    call SetOptimizationTolerance(OptimizationModel,0.01d0)            ! Optimization tolerance
+    call SetOptimizationTolerance(OptimizationModel,0.01d0)          ! Optimization tolerance
     call ReadFiles(OptimizationModel)
     ! 3. Applying the topology optimization
     write(unit=*, fmt=*) '2. Topology optimization'
